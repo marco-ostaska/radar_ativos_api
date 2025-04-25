@@ -1,0 +1,10 @@
+beautifulsoup4
+pandas
+bottleneck
+numpy
+PyYAML
+Requests
+scipy
+streamlit
+yfinance==0.2.54
+fastapi[all]
