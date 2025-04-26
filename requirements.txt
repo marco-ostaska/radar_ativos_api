@@ -1,10 +1,4 @@
-beautifulsoup4
-pandas
-bottleneck
-numpy
-PyYAML
-Requests
-scipy
-streamlit
+pandas==1.5.3
+scipy==1.15.2
 yfinance==0.2.54
-fastapi[all]
+yfinance==0.2.55
