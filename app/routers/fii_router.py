@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.services.fii_detalhe import FiiDetalhe
 
-router = APIRouter()
+router = APIRouter(prefix="/fii", tags=["FII"])
 
 fii_detalhe = FiiDetalhe()
 
