@@ -124,7 +124,7 @@ def main():
     Teste local da avaliação de um FII.
     """
     fii_data = FII('HSLG11.SA')
-    fii_score = evaluate_fii(fii_data, 7)  # Supondo índice base 7% real
+    fii_score = evaluate_fii(fii_data, 7.5)  # Supondo índice base 7% real
     print(f"Nota do FII {fii_data.ticker}: {fii_score}/10")
 
 

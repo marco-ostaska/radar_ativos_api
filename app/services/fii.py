@@ -135,6 +135,7 @@ class FII:
         return round(min(max(overall_risk, 1), 10), 1)
 
 
+
 def convert_unix_date(unix_date: int) -> str:
     """
     Converte uma data em formato Unix timestamp para string no formato dd/mm.

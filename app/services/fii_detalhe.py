@@ -2,6 +2,7 @@ from app.db.indicadores_ativos_db import IndicadoresAtivosDB
 from app.services.banco_central import SELIC, IPCA
 from app.services.indice_refresher import IndiceRefresher
 from app.services.fii import FII
+from app.services import score_fii
 
 
 class FiiDetalhe:
@@ -36,8 +37,11 @@ class FiiDetalhe:
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
         risco = round(11 - ativo.overall_risk(risco_operacional(tipo)), 1)
+        score = score_fii.evaluate_fii(ativo, indice_base)
 
         return {
+            "tipo": tipo,
+            "melhor_indice": indice_base,
             "ticker": ativo.ticker.split(".")[0],
             "cotacao": round(ativo.cotacao, 2),
             "vpa": round(ativo.vpa, 2),
@@ -46,9 +50,10 @@ class FiiDetalhe:
             "rendimento_real": round(real, 2),
             "potencial": potencial,
             "nota_risco": risco,
+            "score": score,
             "indice_base": indice_base,
             "spread_usado": spread_total,
-            "risco_preco_volatilidade": ativo.risco_preco_volatilidade
+
         }
 
     def calcular_detalhado(self, ticker: str, tipo: str) -> dict:
@@ -116,7 +121,7 @@ def main():
     fii = FiiDetalhe()
 
     print("\n--- Teste: RADAR ---")
-    radar = fii.calcular_radar("HGLG11", "logistica")
+    radar = fii.calcular_radar("HSLG11", "shopping")
     print(radar)
 
     print("\n--- Teste: DETALHADO ---")
