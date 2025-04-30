@@ -47,7 +47,8 @@ class FiiDetalhe:
             "potencial": potencial,
             "nota_risco": risco,
             "indice_base": indice_base,
-            "spread_usado": spread_total
+            "spread_usado": spread_total,
+            "risco_preco_volatilidade": ativo.risco_preco_volatilidade
         }
 
     def calcular_detalhado(self, ticker: str, tipo: str) -> dict:
