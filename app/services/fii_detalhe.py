@@ -113,7 +113,8 @@ def risco_operacional(tipo: str) -> int:
     """
     Atribui risco operacional com base no tipo de FII.
     """
-    tipos = {"shopping": 4, "logistica": 2, "papel": 8, "hibrido": 6, "infra": 8, "fiagro": 8}
+
+    tipos = {"shopping": 4, "logistica": 2, "papel": 8, "hibrido": 6}
     return tipos.get(tipo, 10)
 
 

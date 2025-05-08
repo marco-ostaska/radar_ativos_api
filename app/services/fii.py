@@ -78,22 +78,29 @@ class FII:
 
     @property
     def risco_liquidez(self):
+        if "averageVolume" not in self.info:
+            return 10
         volume = self.info.get("averageVolume", 0)
         if volume > 50000:
             return 1
-        if volume > 20000:
+        elif volume > 20000:
             return 5
         return 10
 
     @property
     def risco_tamanho(self):
+        if "marketCap" not in self.info:
+            return 10
         market_cap = self.info.get("marketCap", 0)
         if market_cap < 500_000_000:
             return 5
         return 1
 
+
     @property
     def risco_preco_volatilidade(self):
+        if "52WeekChange" not in self.info:
+            return 10
         variacao_52w = self.info.get("52WeekChange", 0)
         if variacao_52w < -0.15:
             return 10
@@ -103,6 +110,8 @@ class FII:
 
     @property
     def risco_rendimento(self):
+        if "dividendYield" not in self.info:
+            return 10
         dy = self.info.get("dividendYield", 0)
         if dy > 12:
             return 10
@@ -136,6 +145,8 @@ class FII:
 
 
 
+
+
 def convert_unix_date(unix_date: int) -> str:
     """
     Converte uma data em formato Unix timestamp para string no formato dd/mm.
@@ -153,7 +164,7 @@ def get_investidor10(ticker: str) -> Investidor10Service:
 
 
 def main():
-    fii = FII('HSML11.SA')
+    fii = FII('VGIA11.SA')
 
     print(f"Ticker: {fii.ticker}")
     print(f"Valor Patrimonial: {fii.valor_patrimonial}")
@@ -167,7 +178,7 @@ def main():
     print(f"Risco de Tamanho: {fii.risco_tamanho}")
     print(f"Risco de Preço e Volatilidade: {fii.risco_preco_volatilidade}")
     print(f"Risco de Rendimento: {fii.risco_rendimento}")
-    print(f"Overall Risk: {fii.overall_risk(3)}")
+    print(f"Overall Risk: {fii.overall_risk(10)}")
     print(f"Histórico de Dividendos: {fii.historico_dividendos}")
     # print(fii.info) # para debug completo
 
