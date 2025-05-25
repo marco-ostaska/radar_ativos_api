@@ -1,33 +1,36 @@
-# app/db/banco_central_db.py
-
-from app.db.mongo import get_db
+import sqlite3
 from datetime import datetime
+from app.db.sqlite import get_db
 
 class BancoCentralDB:
     """
-    Acesso aos dados de índices do Banco Central na base MongoDB.
+    Acesso aos dados de índices do Banco Central na base SQLite,
+    com estrutura: indice (PK), valor, data_atualizacao.
     """
-
-    def __init__(self):
-        self.collection = get_db()["indicadores"]  # Conecta na coleção 'indicadores'
 
     def get_indices(self):
         """
-        Busca o documento de índices no banco de dados.
-
-        :return: Documento dos índices (sem o campo _id)
+        Busca todos os índices disponíveis no banco de dados.
         """
-        return self.collection.find_one({"_id": "bc"}, {"_id": 0})
+        conn = get_db()
+        cur = conn.execute("SELECT * FROM indices_banco_central")
+        rows = cur.fetchall()
+        conn.close()
+        return {row['indice']: {'valor': row['valor'], 'data_atualizacao': row['data_atualizacao']} for row in rows}
 
     def save_indices(self, data: dict):
         """
-        Atualiza ou cria o documento de índices, usando sempre _id = 'bc'.
-
-        :param data: Dicionário contendo os índices a salvar
+        Insere ou atualiza cada índice no banco de dados.
         """
-        data["_id"] = "bc"  # Garante _id fixo
-        data["date"] = datetime.now().strftime("%Y-%m-%d")
-        self.collection.replace_one({"_id": "bc"}, data, upsert=True)
+        conn = get_db()
+        data_atualizacao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for indice, valor in data.items():
+            conn.execute("""
+                INSERT OR REPLACE INTO indices_banco_central (indice, valor, data_atualizacao)
+                VALUES (?, ?, ?)
+            """, (indice, valor, data_atualizacao))
+        conn.commit()
+        conn.close()
 
 # 🔥 Função de teste manual
 def main():

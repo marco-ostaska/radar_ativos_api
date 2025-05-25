@@ -1,12 +1,10 @@
 from datetime import datetime, timedelta
-
 from app.db.banco_central_db import BancoCentralDB
 from app.services.banco_central import SELIC, IPCA
 
-
 class IndiceRefresher:
     """
-    Serviço para gerenciar índices: busca no MongoDB ou atualiza via Banco Central.
+    Serviço para gerenciar índices: busca no SQLite ou atualiza via Banco Central.
     """
 
     def __init__(self):
@@ -21,12 +19,16 @@ class IndiceRefresher:
         :return: Dicionário com índices (selic, ipca, etc)
         """
         if not force_update:
-            indices = self.repo.get_indices()
-            if indices:
-                data_cache = datetime.strptime(indices["date"], "%Y-%m-%d")
-                if datetime.now() - data_cache < timedelta(days=self.cache_dias_valido):
-                    return indices
+            indices_dict = self.repo.get_indices()  # Novo formato: {indice: {valor, data_atualizacao}}
+            if indices_dict:
+                # Vamos pegar a data mais recente entre os índices
+                datas = [datetime.strptime(v["data_atualizacao"], "%Y-%m-%d %H:%M:%S") for v in indices_dict.values() if v.get("data_atualizacao")]
+                if datas:
+                    data_cache = max(datas)
+                    if datetime.now() - data_cache < timedelta(days=self.cache_dias_valido):
+                        return {k: v["valor"] for k, v in indices_dict.items()}
 
+        # Atualizar via API se necessário
         try:
             selic = SELIC(5)
             ipca = IPCA(5)
@@ -41,7 +43,8 @@ class IndiceRefresher:
             }
 
             self.repo.save_indices(novo_indices)
-            return self.repo.get_indices()
+            indices_atualizados = self.repo.get_indices()
+            return {k: v["valor"] for k, v in indices_atualizados.items()}
 
         except Exception as e:
             raise RuntimeError(f"Erro ao atualizar índices: {str(e)}")
@@ -53,10 +56,9 @@ class IndiceRefresher:
         :return: Valor do melhor índice
         """
         indices = self.get_indices()
-        return max(indices["selic"], indices["ipca"])
+        return max(indices.get("selic", 0), indices.get("ipca", 0))
 
-
-def main():
+if __name__ == "__main__":
     refresher = IndiceRefresher()
 
     print("\n--- Teste: Buscar índices normais ---")
@@ -70,6 +72,3 @@ def main():
     print("\n--- Teste: Melhor índice ---")
     melhor = refresher.melhor_indice()
     print(f"Melhor índice: {melhor}")
-
-if __name__ == "__main__":
-    main()

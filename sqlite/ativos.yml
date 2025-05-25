@@ -1,0 +1,121 @@
+acoes:
+  spread: 0
+  tickers:
+  - ticker: ' MOTV3'
+  - ticker: ABEV3
+  - ticker: AGRO3
+  - ticker: ALOS3
+  - ticker: B3SA3
+  - ticker: BBAS3
+  - ticker: BBDC4
+  - ticker: BBSE3
+  - ticker: CAML3
+  - ticker: CCRO3
+  - ticker: CMIG4
+  - ticker: CPFE3
+  - ticker: CSMG3
+  - ticker: CSNA3
+  - ticker: CXSE3
+  - ticker: ECOR3
+  - ticker: EGIE3
+  - ticker: EKTR3
+  - ticker: EQTL3
+  - ticker: FLRY3
+  - ticker: GGBR4
+  - ticker: GRND3
+  - ticker: HAPV3
+  - ticker: HYPE3
+  - ticker: INTB3
+  - ticker: ITSA4
+  - ticker: ITUB3
+  - ticker: ITUB4
+  - ticker: JALL3
+  - ticker: JBSS3
+  - ticker: KEPL3
+  - ticker: KLBN11
+  - ticker: LEVE3
+  - ticker: MRFG3
+  - ticker: NEOE3
+  - ticker: PETR3
+  - ticker: PETR4
+  - ticker: POMO3
+  - ticker: POSI3
+  - ticker: PRIO3
+  - ticker: PSSA3
+  - ticker: RADL3
+  - ticker: RANI3
+  - ticker: RAPT3
+  - ticker: RENT3
+  - ticker: SANB11
+  - ticker: SAPR3
+  - ticker: SBSP3
+  - ticker: SLCE3
+  - ticker: STBP3
+  - ticker: SUZB3
+  - ticker: TAEE11
+  - ticker: TGMA3
+  - ticker: TIMS3
+  - ticker: TOTS3
+  - ticker: UNIP6
+  - ticker: VALE3
+  - ticker: VIVA3
+  - ticker: VIVT3
+  - ticker: WEGE3
+fiagro:
+  spread: 8
+  tickers:
+  - ticker: BTRA11
+  - ticker: BTAL11
+  - ticker: FGAA11
+  - ticker: KNCA11
+  - ticker: RURA11
+  - ticker: RZAG11
+  - ticker: VGIA11
+  - ticker: XPCA11
+hibrido:
+  spread: 4
+  tickers:
+  - ticker: ALZR11
+  - ticker: GARE11
+  - ticker: HGRU11
+  - ticker: KNRI11
+  - ticker: MAXR11
+  - ticker: RBVA11
+  - ticker: TGAR11
+  - ticker: TRXF11
+infra:
+  spread: 8
+  tickers:
+  - ticker: BDIF11
+  - ticker: IFRA11
+  - ticker: XPID11
+logistica:
+  spread: 3
+  tickers:
+  - ticker: BRCO11
+  - ticker: BTLG11
+  - ticker: GGRC11
+  - ticker: HGLG11
+  - ticker: HSLG11
+  - ticker: LVBI11
+  - ticker: PATL11
+  - ticker: VILG11
+  - ticker: XPIN11
+  - ticker: XPLG11
+papel:
+  spread: 5
+  tickers:
+  - ticker: BCRI11
+  - ticker: HSAF11
+  - ticker: KNCR11
+  - ticker: KNHY11
+  - ticker: KNIP11
+  - ticker: KNSC11
+shopping:
+  spread: 3
+  tickers:
+  - ticker: HGBS11
+  - ticker: HSML11
+  - ticker: MALL11
+  - ticker: VISC11
+  - ticker: XPML11

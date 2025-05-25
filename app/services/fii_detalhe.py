@@ -110,12 +110,9 @@ class FiiDetalhe:
 
 
 def risco_operacional(tipo: str) -> int:
-    """
-    Atribui risco operacional com base no tipo de FII.
-    """
-
-    tipos = {"shopping": 4, "logistica": 2, "papel": 8, "hibrido": 6}
-    return tipos.get(tipo, 10)
+    db = IndicadoresAtivosDB()
+    risco = db.get_risco(tipo)  # Novo método que consulta a tabela tipos
+    return risco if risco is not None else 10  # Valor padrão se não encontrar
 
 
 def main():
