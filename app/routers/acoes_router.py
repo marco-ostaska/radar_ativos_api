@@ -29,6 +29,7 @@ def obter_detalhes_acao(ticker: str = Query(..., description="Ticker da ação, 
         score_valor = score_acao.evaluate_company(acao.acao, indice_base)
         cota_necessaria = round(1000 / ((acao.dy_estimado * acao.cotacao) / 12), 0) if acao.dy_estimado else 0
         investimento_necessario = cota_necessaria * acao.cotacao
+        
 
         return {
             "ticker": ticker.replace(".SA", ""),
@@ -78,6 +79,20 @@ def obter_dados_acao(ticker: str = Query(..., description="Ticker da ação, ex:
         potencial = round(((base - acao.cotacao) / acao.cotacao) * 100, 2)
         nota_risco = 11 - acao.risco_geral
         score_valor = score_acao.evaluate_company(acao.acao, indice_base)
+        criteria_sum = (sum([
+            (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao,
+            teto_dy_valor > acao.cotacao,
+            dy_estimado >= indice_base,
+            dy_estimado >= indices['selic_atual'],
+            real > 0,
+            potencial > 0,
+            acao.earning_yield > indices['ipca_atual'],
+        ])) if (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao else 0
+        comprar = (
+            criteria_sum == 7 or
+            (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao or
+            (teto_dy_valor > acao.cotacao and dy_estimado >= indice_base)
+        )
 
         return {
             "ticker": ticker.replace(".SA", ""),
@@ -90,6 +105,8 @@ def obter_dados_acao(ticker: str = Query(..., description="Ticker da ação, ex:
             "earning_yield": round(acao.earning_yield, 2),
             "nota_risco": round(nota_risco, 2),
             "score": round(score_valor, 2),
+            "criteria_sum": int(criteria_sum),
+            "comprar": bool(comprar),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
