@@ -83,15 +83,15 @@ def obter_dados_acao(ticker: str = Query(..., description="Ticker da ação, ex:
             (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao,
             teto_dy_valor > acao.cotacao,
             dy_estimado >= indice_base,
-            dy_estimado >= indices['selic_atual'],
+            dy_estimado >= (indices['selic_atual'] - indices['ipca_atual']),
             real > 0,
             potencial > 0,
-            acao.earning_yield > indices['ipca_atual'],
+            acao.earning_yield > (indices['selic_atual'] - indices['ipca_atual']),
         ])) if (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao else 0
         comprar = (
             criteria_sum == 7 or
             (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao or
-            (teto_dy_valor > acao.cotacao and dy_estimado >= indice_base)
+            (teto_dy_valor > acao.cotacao and dy_estimado >= (indices['selic_atual'] - indices['ipca_atual']))
         )
 
         return {

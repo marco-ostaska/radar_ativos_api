@@ -38,6 +38,13 @@ class FiiDetalhe:
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
         risco = round(11 - ativo.overall_risk(risco_operacional(tipo)), 1)
         score = score_fii.evaluate_fii(ativo, indice_base)
+        criteria_sum = sum([
+    ativo.vpa > ativo.cotacao,
+    teto_div > ativo.cotacao,
+    real > (indices["selic_atual"] - indices["ipca_atual"]),
+])
+  
+        comprar = int(criteria_sum) == 3
 
         return {
             "tipo": tipo,
@@ -53,6 +60,8 @@ class FiiDetalhe:
             "score": score,
             "indice_base": indice_base,
             "spread_usado": spread_total,
+            "criteria_sum": int(criteria_sum),
+            "comprar": bool(comprar),
 
         }
 
