@@ -68,14 +68,56 @@ class Investidor10Service:
             value = tag.find_next('span').text.strip()
             return float(value.replace(",", "."))
         return None
+    
 
+    def get_info_from_table(self, field_name: str) -> str | None:
+        """
+        Busca informações específicas na tabela de indicadores.
+
+        :param field_name: Nome do campo a buscar (ex: 'SEGMENTO')
+        :return: Valor do campo ou None se não encontrado
+        """
+        table = self.soup.find('div', id='table-indicators')
+        if not table:
+            return None
+
+        for cell in table.find_all('div', class_='cell'):
+            label_span = cell.find('span', class_='d-flex justify-content-between align-items-center name')
+            if label_span:
+                label = label_span.get_text(strip=True).upper()
+                if field_name.upper() in label:
+                    value_div = cell.find('div', class_='value')
+                    if value_div:
+                        value_span = value_div.find('span')
+                        if value_span:
+                            return value_span.get_text(strip=True)
+        return None
+
+    def get_segmento(self) -> str | None:
+        segmento = self.get_info_from_table("SEGMENTO")
+        if segmento is None:
+            return None
+        
+        if "fiagro" in segmento.lower():
+            return "fiagro"
+        
+        if "brido" in segmento.lower():
+            return "hibrido"
+        
+        if "infra" in segmento.lower():
+            return "infra"
+        
+        if "stic" in segmento.lower():
+            return "logistica"
+        
+        return "papel"
 
 def main():
     """
     Testa a coleta de dados de um FII via Investidor10 usando requests.
     """
     try:
-        fii_scraper = Investidor10Service("VGIA11")
+        fii_scraper = Investidor10Service("XPLG11")  # Exemplo de ticker, substitua conforme necessário
 
         cotacao = fii_scraper.get_cotacao()
         dy = fii_scraper.get_dividend_yield()
@@ -85,6 +127,7 @@ def main():
         print(f"Cotação: {cotacao if cotacao is not None else 'Não encontrado'}")
         print(f"Dividend Yield: {dy if dy is not None else 'Não encontrado'}%")
         print(f"P/VP: {pvp if pvp is not None else 'Não encontrado'}")
+        print(f"Segmento: {fii_scraper.get_segmento() if fii_scraper.get_segmento() else 'Não encontrado'}")
 
     except Exception as e:
         print(f"Erro ao acessar Investidor10: {e}")
