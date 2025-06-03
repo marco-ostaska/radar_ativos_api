@@ -14,6 +14,15 @@ class FII:
     def __init__(self, ticker: str):
         self.ticker = ticker.upper()
         self.fii = yf.Ticker(self.ticker)
+        self._i10_service = None
+
+
+    @property
+    def i10_service(self):
+        if self._i10_service is None:
+            ticker = self.ticker.split(".")[0]
+            self._i10_service = Investidor10Service(ticker)
+        return self._i10_service
 
     @property
     def info(self):
@@ -37,7 +46,7 @@ class FII:
     @property
     def vpa(self):
         if self.valor_patrimonial is None or self.cotas_emitidas is None:
-            i10 = get_investidor10(self.ticker)
+            i10 = self.i10_service
             return round(self.cotacao / i10.get_pvp(), 2)
         return round(self.valor_patrimonial / self.cotas_emitidas, 2)
 
@@ -142,6 +151,13 @@ class FII:
         )
 
         return round(min(max(overall_risk, 1), 10), 1)
+    
+    def segmento(self) -> str:
+        """
+        Retorna o tipo do FII (Fundo de Papel, Fundo de Tijolo, etc).
+        """
+        i10 = self.i10_service
+        return i10.get_segmento()
 
 
 
@@ -180,6 +196,7 @@ def main():
     print(f"Risco de Rendimento: {fii.risco_rendimento}")
     print(f"Overall Risk: {fii.overall_risk(10)}")
     print(f"Histórico de Dividendos: {fii.historico_dividendos}")
+    print(f"Segmento: {fii.segmento()}")
     # print(fii.info) # para debug completo
 
 
