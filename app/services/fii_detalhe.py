@@ -14,7 +14,7 @@ class FiiDetalhe:
         self.indices_service = IndiceRefresher()
         self.db = IndicadoresAtivosDB()
 
-    def calcular_radar(self, ticker: str, tipo: str) -> dict:
+    def get_radar(self, ticker: str) -> dict:
         """
         Retorna os dados simplificados do FII para tela de radar.
 
@@ -27,7 +27,8 @@ class FiiDetalhe:
             ticker += ".SA"
 
         ativo = FII(ticker)
-        spread = self.db.get_spread(tipo)
+        segmento = ativo.i10_service.get_segmento()
+        spread = self.db.get_spread(segmento)
         indice_base = self.indices_service.melhor_indice()
         spread_total = spread + indice_base
         indices = self.indices_service.get_indices()
@@ -36,7 +37,7 @@ class FiiDetalhe:
         teto_div = ativo.dividendo_estimado / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
-        risco = round(11 - ativo.overall_risk(risco_operacional(tipo)), 1)
+        risco = round(11 - ativo.overall_risk(risco_operacional(segmento)), 1)
         score = score_fii.evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
     ativo.vpa > ativo.cotacao,
@@ -47,7 +48,7 @@ class FiiDetalhe:
         comprar = int(criteria_sum) == 3
 
         return {
-            "tipo": tipo,
+            "tipo": segmento,
             "melhor_indice": indice_base,
             "ticker": ativo.ticker.split(".")[0],
             "cotacao": round(ativo.cotacao, 2),
@@ -65,7 +66,7 @@ class FiiDetalhe:
 
         }
 
-    def calcular_detalhado(self, ticker: str, tipo: str) -> dict:
+    def get_detalhado(self, ticker: str) -> dict:
         """
         Retorna todos os dados detalhados do FII.
 
@@ -78,6 +79,7 @@ class FiiDetalhe:
             ticker += ".SA"
 
         ativo = FII(ticker)
+        tipo = ativo.i10_service.get_segmento()
         spread = self.db.get_spread(tipo)
         indice_base = self.indices_service.melhor_indice()
         spread_total = spread + indice_base
@@ -128,11 +130,11 @@ def main():
     fii = FiiDetalhe()
 
     print("\n--- Teste: RADAR ---")
-    radar = fii.calcular_radar("HSLG11", "shopping")
+    radar = fii.get_radar("HSLG11")
     print(radar)
 
     print("\n--- Teste: DETALHADO ---")
-    detalhado = fii.calcular_detalhado("HGLG11", "logistica")
+    detalhado = fii.get_detalhado("HGLG11")
     print(detalhado)
 
 
