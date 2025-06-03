@@ -27,8 +27,8 @@ class FiiDetalhe:
             ticker += ".SA"
 
         ativo = FII(ticker)
-        segmento = ativo.i10_service.get_segmento()
-        spread = self.db.get_spread(segmento)
+        tipo = ativo.i10_service.get_segmento()
+        spread = self.db.get_spread(tipo)
         indice_base = self.indices_service.melhor_indice()
         spread_total = spread + indice_base
         indices = self.indices_service.get_indices()
@@ -37,18 +37,20 @@ class FiiDetalhe:
         teto_div = ativo.dividendo_estimado / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
-        risco = round(11 - ativo.overall_risk(risco_operacional(segmento)), 1)
+        risco = round(11 - ativo.overall_risk(risco_operacional(        tipo = ativo.i10_service.get_segmento()
+)), 1)
         score = score_fii.evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
-    ativo.vpa > ativo.cotacao,
-    teto_div > ativo.cotacao,
-    real > (indices["selic_atual"] - indices["ipca_atual"]),
-])
+                            ativo.vpa > ativo.cotacao,
+                            teto_div > ativo.cotacao,
+                            real > (indices["selic_atual"] - indices["ipca_atual"]),
+                        ])
   
         comprar = int(criteria_sum) == 3
 
         return {
-            "tipo": segmento,
+            "tipo": tipo,
+            "spread": round(spread, 4),
             "melhor_indice": indice_base,
             "ticker": ativo.ticker.split(".")[0],
             "cotacao": round(ativo.cotacao, 2),
@@ -112,6 +114,7 @@ class FiiDetalhe:
             "risco_rendimento": ativo.risco_rendimento,
             "nota_risco": risco,
             "indice_base": indice_base,
+            "spread": round(spread, 4),
             "spread_usado": spread_total,
             "historico_dividendos": {k: round(v, 4) for k, v in ativo.historico_dividendos.items()},
             "raw_dividends": ativo.dividends.tail(12).to_dict(),
@@ -130,7 +133,7 @@ def main():
     fii = FiiDetalhe()
 
     print("\n--- Teste: RADAR ---")
-    radar = fii.get_radar("HSLG11")
+    radar = fii.get_radar("HSML11")
     print(radar)
 
     print("\n--- Teste: DETALHADO ---")

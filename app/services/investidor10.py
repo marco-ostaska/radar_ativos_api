@@ -109,6 +109,9 @@ class Investidor10Service:
         
         if "stic" in segmento.lower():
             return "logistica"
+
+        if "shopping" in segmento.lower():
+            return "shopping"
         
         return "papel"
 
@@ -117,7 +120,7 @@ def main():
     Testa a coleta de dados de um FII via Investidor10 usando requests.
     """
     try:
-        fii_scraper = Investidor10Service("XPLG11")  # Exemplo de ticker, substitua conforme necessário
+        fii_scraper = Investidor10Service("HSML11")  # Exemplo de ticker, substitua conforme necessário
 
         cotacao = fii_scraper.get_cotacao()
         dy = fii_scraper.get_dividend_yield()

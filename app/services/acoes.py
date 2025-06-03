@@ -1,5 +1,4 @@
 from math import sqrt
-from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
@@ -174,7 +173,7 @@ class Acao:
     def lpa(self) -> float | None:
         """Lucro por ação (Trailing EPS)."""
         return self.acao.info.get('trailingEps')
-
+    
 
 def main():
     ativo = Acao("VALE3.SA")
