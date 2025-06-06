@@ -55,9 +55,11 @@ async def obter_carteira_acoes(
                 elif tipo == 'VENDA':
                     quantidade_total -= qtd
             
-            # Obtém preço atual
+            # Obtém preço atual e tetos
             acao = Acao(ticker)
             preco_atual = acao.cotacao
+            teto_por_lucro = acao.calcular_teto_cotacao_lucro()
+            teto_por_dy = acao.cotacao / acao.dy if acao.dy > 0 else None
             
             # Calcula variação
             variacao = ((preco_atual - preco_medio) / preco_medio) * 100 if preco_medio > 0 else 0
@@ -66,6 +68,22 @@ async def obter_carteira_acoes(
             valor_investido = preco_medio * quantidade
             saldo = preco_atual * quantidade
             
+            # Calcula indicadores para recomendação
+            lucro_latente = (preco_atual / preco_medio - 1) * 100 if preco_medio > 0 else 0
+            
+            excesso_pl = (preco_atual / teto_por_lucro - 1) * 100 if teto_por_lucro else 0
+            excesso_dy = (preco_atual / teto_por_dy - 1) * 100 if teto_por_dy else 0
+            
+            # Define recomendação
+            if excesso_pl > 20 and excesso_dy > 20 and lucro_latente > 30:
+                recomendacao = "VENDER ou realizar parcial"
+            elif excesso_pl > 10 or excesso_dy > 10:
+                recomendacao = "MANTER com cautela"
+            elif excesso_pl < 0 and excesso_dy < 0:
+                recomendacao = "COMPRAR ou APORTAR"
+            else:
+                recomendacao = "MANTER"
+            
             resultado.append({
                 "ticker": ticker,
                 "quantidade": quantidade,
@@ -73,7 +91,11 @@ async def obter_carteira_acoes(
                 "preco_atual": round(preco_atual, 2),
                 "variacao": round(variacao, 2),
                 "valor_investido": round(valor_investido, 2),
-                "saldo": round(saldo, 2)
+                "saldo": round(saldo, 2),
+                "lucro_latente": round(lucro_latente, 2),
+                "excesso_pl": round(excesso_pl, 2),
+                "excesso_dy": round(excesso_dy, 2),
+                "recomendacao": recomendacao
             })
         
         return resultado
