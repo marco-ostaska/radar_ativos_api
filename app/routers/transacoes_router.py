@@ -350,4 +350,79 @@ def atualizar_transacao_fii(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        conn.close() 
+        conn.close()
+
+@router.post("/acoes/desdobramento")
+async def aplicar_desdobramento(
+    ticker: str = Query(..., description="Código da ação (ex: PETR4)"),
+    data_desdobramento: str = Query(..., description="Data do desdobramento (dd/mm/yyyy)"),
+    proporcao_antes: int = Query(..., description="Proporção antes (ex: 1)"),
+    proporcao_depois: int = Query(..., description="Proporção depois (ex: 10)"),
+    carteira_id: int = Query(..., description="ID da carteira")
+):
+    """
+    Aplica um desdobramento em todas as transações de uma ação até a data especificada.
+    Exemplo: desdobramento 10:1 (proporcao_antes=1, proporcao_depois=10)
+    """
+    # Validações básicas
+    if proporcao_antes <= 0 or proporcao_depois <= 0:
+        raise HTTPException(status_code=400, detail="Proporções devem ser maiores que zero")
+    
+    if proporcao_depois <= proporcao_antes:
+        raise HTTPException(status_code=400, detail="Proporção depois deve ser maior que proporção antes")
+    
+    # Normaliza o ticker
+    ticker = ticker.upper()
+    if not ticker.endswith('.SA'):
+        ticker += '.SA'
+    
+    # Valida e converte a data
+    try:
+        data_obj = datetime.strptime(data_desdobramento, '%d/%m/%Y')
+        data_desdobramento = data_obj.strftime('%Y-%m-%d')
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data deve estar no formato dd/mm/yyyy")
+    
+    try:
+        # Conecta ao banco
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        
+        # Busca todas as transações do ticker até a data do desdobramento
+        cursor.execute("""
+            SELECT id, quantidade, preco
+            FROM transacoes_acoes
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            ORDER BY data_transacao DESC
+        """, (ticker, carteira_id, data_desdobramento))
+        
+        transacoes = cursor.fetchall()
+        if not transacoes:
+            raise HTTPException(status_code=404, detail="Nenhuma transação encontrada para este ticker até a data especificada")
+        
+        # Calcula o fator de ajuste
+        fator_ajuste = proporcao_depois / proporcao_antes
+        
+        # Atualiza cada transação
+        for transacao in transacoes:
+            transacao_id, quantidade, preco = transacao
+            nova_quantidade = quantidade * fator_ajuste
+            novo_preco = preco / fator_ajuste
+            
+            cursor.execute("""
+                UPDATE transacoes_acoes
+                SET quantidade = ?, preco = ?
+                WHERE id = ?
+            """, (nova_quantidade, novo_preco, transacao_id))
+        
+        conn.commit()
+        return {"mensagem": "Desdobramento aplicado com sucesso"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao aplicar desdobramento: {str(e)}")
+        
+    finally:
+        if 'conn' in locals():
+            conn.close() 

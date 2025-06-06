@@ -1,63 +1,75 @@
+You are an expert in Python, FastAPI, and SQLite development.
 
-  You are an expert in Python, FastAPI, and scalable API development.
-  
-  Key Principles
-  - Write concise, technical responses with accurate Python examples.
-  - Use solid Principals
-  - Prefer iteration and modularization over code duplication.
-  - Use descriptive variable names with auxiliary verbs (e.g., is_active, has_permission).
-  - Use lowercase with underscores for directories and files (e.g., routers/user_routes.py).
-  - Favor named exports for routes and utility functions.
-  - Use the Receive an Object, Return an Object (RORO) pattern.
-  
-  Python/FastAPI
-  - Use def for pure functions and async def for asynchronous operations.
-  - Use type hints for all function signatures. Prefer Pydantic models over raw dictionaries for input validation.
-  - File structure: exported router, sub-routes, utilities, static content, types (models, schemas).
-  - Avoid unnecessary curly braces in conditional statements.
-  - For single-line statements in conditionals, omit curly braces.
-  - Use concise, one-line syntax for simple conditional statements (e.g., if condition: do_something()).
-  
-  Error Handling and Validation
-  - Prioritize error handling and edge cases:
-    - Handle errors and edge cases at the beginning of functions.
-    - Use early returns for error conditions to avoid deeply nested if statements.
-    - Place the happy path last in the function for improved readability.
-    - Avoid unnecessary else statements; use the if-return pattern instead.
-    - Use guard clauses to handle preconditions and invalid states early.
-    - Implement proper error logging and user-friendly error messages.
-    - Use custom error types or error factories for consistent error handling.
-  
-  Dependencies
-  - FastAPI
+Key Principles
+- Write simple, direct code without unnecessary abstractions
+- Use SQLite3 directly, no ORM
+- Keep code organized by entity (acoes, fii, carteira)
+- Use clear, descriptive names in Portuguese
+- Follow the existing project structure and patterns
 
-  - Async database libraries like asyncpg or aiomysql
+Project Structure
+- Routers: app/routers/<entidade>_router.py
+- Services: app/services/<entidade>_service.py
+- Models: app/models/<entidade>.py
+- SQL: sqlite/*.sql
 
-  
-  FastAPI-Specific Guidelines
-  - Use functional components (plain functions) and Pydantic models for input validation and response schemas.
-  - Use declarative route definitions with clear return type annotations.
-  - Use def for synchronous operations and async def for asynchronous ones.
-  - Minimize @app.on_event("startup") and @app.on_event("shutdown"); prefer lifespan context managers for managing startup and shutdown events.
-  - Use middleware for logging, error monitoring, and performance optimization.
-  - Optimize for performance using async functions for I/O-bound tasks, caching strategies, and lazy loading.
-  - Use HTTPException for expected errors and model them as specific HTTP responses.
-  - Use middleware for handling unexpected errors, logging, and error monitoring.
-  - Use Pydantic's BaseModel for consistent input/output validation and response schemas.
-  
-  Performance Optimization
-  - Minimize blocking I/O operations; use asynchronous operations for all database calls and external API requests.
-  - Implement caching for static and frequently accessed data using tools like Redis or in-memory stores.
-  - Optimize data serialization and deserialization with Pydantic.
-  - Use lazy loading techniques for large datasets and substantial API responses.
-  
-  Key Conventions
-  1. Rely on FastAPI’s dependency injection system for managing state and shared resources.
-  2. Prioritize API performance metrics (response time, latency, throughput).
-  3. Limit blocking operations in routes:
-     - Favor asynchronous and non-blocking flows.
-     - Use dedicated async functions for database and external API operations.
-     - Structure routes and dependencies clearly to optimize readability and maintainability.
-  
-  Refer to FastAPI documentation for Data Models, Path Operations, and Middleware for best practices.
+Database
+- Use sqlite3 directly, no ORM
+- Write explicit SQL queries
+- Always commit after write operations
+- Convert dates to %Y-%m-%d format before saving
+- Use simple table structures without unnecessary relationships
+
+API Endpoints
+- Use explicit, semantic names in plural:
+  - /transacoes/acoes/listar
+  - /transacoes/acoes/adicionar
+  - /transacoes/acoes/atualizar/{id}
+  - /transacoes/acoes/deletar/{id}
+  - /transacoes/acoes/desdobramento (for special operations)
+- Use appropriate HTTP methods:
+  - GET for listing/searching
+  - POST for creating
+  - PUT for updating
+  - DELETE for removing
+
+Code Style
+- No Pydantic, SQLAlchemy, or other ORMs
+- Simple classes without inheritance
+- Manual validation in models or services
+- Direct SQL queries
+- Clear variable names in Portuguese
+- Minimal abstraction layers
+
+What to Avoid
+- Don't create extra tables unless absolutely necessary
+- Don't use frameworks that add unnecessary complexity
+- Don't create abstraction layers that don't match the project style
+- Don't use external validation libraries
+
+Example Flow
+1. Adding a transaction:
+   POST /transacoes/acoes/adicionar
+   - Direct SQLite insert
+   - Manual validation
+   - Simple response
+
+2. Listing transactions:
+   GET /transacoes/acoes/listar?carteira_id=1
+   - Direct SQLite select
+   - Simple data transformation
+   - Clear response format
+
+3. Special operations (like stock splits):
+   POST /transacoes/acoes/desdobramento
+   - Update existing records
+   - No new tables
+   - Direct SQL updates
+
+Remember
+- Keep it simple
+- Follow existing patterns
+- Use direct SQL
+- No unnecessary abstractions
+- Clear, explicit code
   
