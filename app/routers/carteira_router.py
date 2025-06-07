@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 from app.services.acoes import Acao
 from app.services.fii import FII
 import sqlite3
@@ -192,6 +192,70 @@ async def obter_carteira_fii(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao obter carteira: {str(e)}")
+        
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@router.delete("/acoes/delete")
+async def deletar_carteira_acoes(
+    carteira_id: int = Query(..., description="ID da carteira de ações a ser deletada")
+):
+    """
+    Deleta todas as transações de uma carteira de ações.
+    """
+    try:
+        # Conecta ao banco
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        
+        # Verifica se existem transações para esta carteira
+        cursor.execute("SELECT COUNT(*) FROM transacoes_acoes WHERE carteira_id = ?", (carteira_id,))
+        count = cursor.fetchone()[0]
+        
+        if count == 0:
+            raise HTTPException(status_code=404, detail=f"Não existem transações para a carteira de ações {carteira_id}")
+        
+        # Deleta todas as transações associadas à carteira
+        cursor.execute("DELETE FROM transacoes_acoes WHERE carteira_id = ?", (carteira_id,))
+        
+        conn.commit()
+        return {"mensagem": f"{count} transações da carteira de ações {carteira_id} foram deletadas com sucesso"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar carteira: {str(e)}")
+        
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@router.delete("/fii/delete")
+async def deletar_carteira_fii(
+    carteira_id: int = Query(..., description="ID da carteira de FII a ser deletada")
+):
+    """
+    Deleta todas as transações de uma carteira de FII.
+    """
+    try:
+        # Conecta ao banco
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        
+        # Verifica se existem transações para esta carteira
+        cursor.execute("SELECT COUNT(*) FROM transacoes_fii WHERE carteira_id = ?", (carteira_id,))
+        count = cursor.fetchone()[0]
+        
+        if count == 0:
+            raise HTTPException(status_code=404, detail=f"Não existem transações para a carteira de FII {carteira_id}")
+        
+        # Deleta todas as transações associadas à carteira
+        cursor.execute("DELETE FROM transacoes_fii WHERE carteira_id = ?", (carteira_id,))
+        
+        conn.commit()
+        return {"mensagem": f"{count} transações da carteira de FII {carteira_id} foram deletadas com sucesso"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar carteira: {str(e)}")
         
     finally:
         if 'conn' in locals():
