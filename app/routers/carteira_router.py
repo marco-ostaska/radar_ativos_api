@@ -21,11 +21,14 @@ async def obter_carteira_acoes(
         # Busca todas as ações únicas da carteira e suas quantidades
         cursor.execute("""
             SELECT ticker, 
-                   SUM(CASE WHEN tipo_transacao = 'COMPRA' THEN quantidade 
+                   SUM(CASE 
+                           WHEN tipo_transacao = 'COMPRA' THEN quantidade 
                            WHEN tipo_transacao = 'VENDA' THEN -quantidade 
-                           ELSE 0 END) as quantidade
+                           WHEN tipo_transacao IN ('DESDOBRAMENTO', 'AGRUPAMENTO', 'BONIFICACAO') THEN quantidade
+                           ELSE 0 
+                       END) as quantidade
             FROM transacoes_acoes
-            WHERE carteira_id = ?
+            WHERE carteira_id = ? AND ativo = 1
             GROUP BY ticker
             HAVING quantidade > 0
         """, (carteira_id,))
@@ -40,7 +43,7 @@ async def obter_carteira_acoes(
             cursor.execute("""
                 SELECT tipo_transacao, preco, quantidade
                 FROM transacoes_acoes
-                WHERE ticker = ? AND carteira_id = ?
+                WHERE ticker = ? AND carteira_id = ? AND ativo = 1
                 ORDER BY data_transacao
             """, (ticker, carteira_id))
             
@@ -50,7 +53,7 @@ async def obter_carteira_acoes(
             preco_medio = 0
             quantidade_total = 0
             for tipo, preco, qtd in transacoes:
-                if tipo == 'COMPRA':
+                if tipo in ['COMPRA', 'DESDOBRAMENTO', 'AGRUPAMENTO', 'BONIFICACAO']:
                     preco_medio = ((preco_medio * quantidade_total) + (preco * qtd)) / (quantidade_total + qtd)
                     quantidade_total += qtd
                 elif tipo == 'VENDA':
@@ -120,11 +123,14 @@ async def obter_carteira_fii(
         # Busca todos os FIIs únicos da carteira e suas quantidades
         cursor.execute("""
             SELECT ticker, 
-                   SUM(CASE WHEN tipo_transacao = 'COMPRA' THEN quantidade 
+                   SUM(CASE 
+                           WHEN tipo_transacao = 'COMPRA' THEN quantidade 
                            WHEN tipo_transacao = 'VENDA' THEN -quantidade 
-                           ELSE 0 END) as quantidade
+                           WHEN tipo_transacao IN ('DESDOBRAMENTO', 'AGRUPAMENTO', 'BONIFICACAO') THEN quantidade
+                           ELSE 0 
+                       END) as quantidade
             FROM transacoes_fii
-            WHERE carteira_id = ?
+            WHERE carteira_id = ? AND ativo = 1
             GROUP BY ticker
             HAVING quantidade > 0
         """, (carteira_id,))
@@ -139,7 +145,7 @@ async def obter_carteira_fii(
             cursor.execute("""
                 SELECT tipo_transacao, preco, quantidade
                 FROM transacoes_fii
-                WHERE ticker = ? AND carteira_id = ?
+                WHERE ticker = ? AND carteira_id = ? AND ativo = 1
                 ORDER BY data_transacao
             """, (ticker, carteira_id))
             
@@ -149,7 +155,7 @@ async def obter_carteira_fii(
             preco_medio = 0
             quantidade_total = 0
             for tipo, preco, qtd in transacoes:
-                if tipo == 'COMPRA':
+                if tipo in ['COMPRA', 'DESDOBRAMENTO', 'AGRUPAMENTO', 'BONIFICACAO']:
                     preco_medio = ((preco_medio * quantidade_total) + (preco * qtd)) / (quantidade_total + qtd)
                     quantidade_total += qtd
                 elif tipo == 'VENDA':

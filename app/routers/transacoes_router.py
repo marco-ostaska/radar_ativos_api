@@ -17,7 +17,7 @@ def listar_transacoes_acoes(carteira_id: int = Query(..., description="ID da car
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, ticker, data_transacao, tipo_transacao, preco, quantidade
+            SELECT id, ticker, data_transacao, tipo_transacao, preco, quantidade, ativo
             FROM transacoes_acoes
             WHERE carteira_id = ?
             ORDER BY data_transacao DESC
@@ -32,7 +32,8 @@ def listar_transacoes_acoes(carteira_id: int = Query(..., description="ID da car
                 "tipo": row[3],
                 "preco": row[4],
                 "quantidade": row[5],
-                "valor_total": row[4] * row[5]
+                "valor_total": row[4] * row[5],
+                "ativo": row[6]
             })
         
         return transacoes
@@ -50,7 +51,7 @@ def listar_transacoes_fii(carteira_id: int = Query(..., description="ID da carte
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, ticker, data_transacao, tipo_transacao, preco, quantidade
+            SELECT id, ticker, data_transacao, tipo_transacao, preco, quantidade, ativo
             FROM transacoes_fii
             WHERE carteira_id = ?
             ORDER BY data_transacao DESC
@@ -65,7 +66,8 @@ def listar_transacoes_fii(carteira_id: int = Query(..., description="ID da carte
                 "tipo": row[3],
                 "preco": row[4],
                 "quantidade": row[5],
-                "valor_total": row[4] * row[5]
+                "valor_total": row[4] * row[5],
+                "ativo": row[6]
             })
         
         return transacoes
@@ -388,13 +390,14 @@ async def aplicar_desdobramento(
         conn = sqlite3.connect('sqlite/radar_ativos.db')
         cursor = conn.cursor()
         
-        # Busca todas as transações do ticker até a data do desdobramento
+        # Busca todas as transações ativas do ticker até a data do desdobramento
         cursor.execute("""
             SELECT id, quantidade, preco
             FROM transacoes_acoes
             WHERE ticker = ? 
             AND carteira_id = ?
             AND data_transacao <= ?
+            AND ativo = 1
             ORDER BY data_transacao DESC
         """, (ticker, carteira_id, data_desdobramento))
         
@@ -405,23 +408,127 @@ async def aplicar_desdobramento(
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
         
-        # Atualiza cada transação
-        for transacao in transacoes:
-            transacao_id, quantidade, preco = transacao
-            nova_quantidade = quantidade * fator_ajuste
-            novo_preco = preco / fator_ajuste
-            
-            cursor.execute("""
-                UPDATE transacoes_acoes
-                SET quantidade = ?, preco = ?
-                WHERE id = ?
-            """, (nova_quantidade, novo_preco, transacao_id))
+        # Soma todas as quantidades ativas
+        quantidade_total = sum(transacao[1] for transacao in transacoes)
+        
+        # Calcula a nova quantidade (multiplicando para desdobramento)
+        nova_quantidade = int(quantidade_total * fator_ajuste)
+        
+        # Calcula o novo preço
+        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
+        
+        # Marca todas as transações anteriores como inativas
+        cursor.execute("""
+            UPDATE transacoes_acoes
+            SET ativo = 0
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            AND ativo = 1
+        """, (ticker, carteira_id, data_desdobramento))
+        
+        # Cria uma nova transação de desdobramento
+        cursor.execute("""
+            INSERT INTO transacoes_acoes (
+                ticker, data_transacao, tipo_transacao, preco, quantidade, carteira_id, ativo
+            ) VALUES (?, ?, 'DESDOBRAMENTO', ?, ?, ?, 1)
+        """, (ticker, data_desdobramento, novo_preco, nova_quantidade, carteira_id))
         
         conn.commit()
         return {"mensagem": "Desdobramento aplicado com sucesso"}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao aplicar desdobramento: {str(e)}")
+        
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@router.post("/acoes/agrupamento")
+async def aplicar_agrupamento(
+    ticker: str = Query(..., description="Código da ação (ex: PETR4)"),
+    data_agrupamento: str = Query(..., description="Data do agrupamento (dd/mm/yyyy)"),
+    proporcao_antes: int = Query(..., description="Proporção antes (ex: 10)"),
+    proporcao_depois: int = Query(..., description="Proporção depois (ex: 1)"),
+    carteira_id: int = Query(..., description="ID da carteira")
+):
+    """
+    Aplica um agrupamento em todas as transações de uma ação até a data especificada.
+    Exemplo: agrupamento 10:1 (proporcao_antes=10, proporcao_depois=1)
+    """
+    # Validações básicas
+    if proporcao_antes <= 0 or proporcao_depois <= 0:
+        raise HTTPException(status_code=400, detail="Proporções devem ser maiores que zero")
+    
+    if proporcao_antes <= proporcao_depois:
+        raise HTTPException(status_code=400, detail="Proporção antes deve ser maior que proporção depois")
+    
+    # Normaliza o ticker
+    ticker = ticker.upper()
+    if not ticker.endswith('.SA'):
+        ticker += '.SA'
+    
+    # Valida e converte a data
+    try:
+        data_obj = datetime.strptime(data_agrupamento, '%d/%m/%Y')
+        data_agrupamento = data_obj.strftime('%Y-%m-%d')
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data deve estar no formato dd/mm/yyyy")
+    
+    try:
+        # Conecta ao banco
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        
+        # Busca todas as transações ativas do ticker até a data do agrupamento
+        cursor.execute("""
+            SELECT id, quantidade, preco
+            FROM transacoes_acoes
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            AND ativo = 1
+            ORDER BY data_transacao DESC
+        """, (ticker, carteira_id, data_agrupamento))
+        
+        transacoes = cursor.fetchall()
+        if not transacoes:
+            raise HTTPException(status_code=404, detail="Nenhuma transação encontrada para este ticker até a data especificada")
+        
+        # Calcula o fator de ajuste
+        fator_ajuste = proporcao_depois / proporcao_antes
+        
+        # Soma todas as quantidades ativas
+        quantidade_total = sum(transacao[1] for transacao in transacoes)
+        
+        # Calcula a nova quantidade (dividindo para agrupamento)
+        nova_quantidade = int(quantidade_total * fator_ajuste)
+        
+        # Calcula o novo preço
+        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
+        
+        # Marca todas as transações anteriores como inativas
+        cursor.execute("""
+            UPDATE transacoes_acoes
+            SET ativo = 0
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            AND ativo = 1
+        """, (ticker, carteira_id, data_agrupamento))
+        
+        # Cria uma nova transação de agrupamento
+        cursor.execute("""
+            INSERT INTO transacoes_acoes (
+                ticker, data_transacao, tipo_transacao, preco, quantidade, carteira_id, ativo
+            ) VALUES (?, ?, 'AGRUPAMENTO', ?, ?, ?, 1)
+        """, (ticker, data_agrupamento, novo_preco, nova_quantidade, carteira_id))
+        
+        conn.commit()
+        return {"mensagem": "Agrupamento aplicado com sucesso"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao aplicar agrupamento: {str(e)}")
         
     finally:
         if 'conn' in locals():
@@ -463,13 +570,14 @@ async def aplicar_desdobramento_fii(
         conn = sqlite3.connect('sqlite/radar_ativos.db')
         cursor = conn.cursor()
         
-        # Busca todas as transações do FII até a data do desdobramento
+        # Busca todas as transações ativas do FII até a data do desdobramento
         cursor.execute("""
             SELECT id, quantidade, preco
             FROM transacoes_fii
             WHERE ticker = ? 
             AND carteira_id = ?
             AND data_transacao <= ?
+            AND ativo = 1
             ORDER BY data_transacao DESC
         """, (ticker, carteira_id, data_desdobramento))
         
@@ -480,23 +588,127 @@ async def aplicar_desdobramento_fii(
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
         
-        # Atualiza cada transação
-        for transacao in transacoes:
-            transacao_id, quantidade, preco = transacao
-            nova_quantidade = quantidade * fator_ajuste
-            novo_preco = preco / fator_ajuste
-            
-            cursor.execute("""
-                UPDATE transacoes_fii
-                SET quantidade = ?, preco = ?
-                WHERE id = ?
-            """, (nova_quantidade, novo_preco, transacao_id))
+        # Soma todas as quantidades ativas
+        quantidade_total = sum(transacao[1] for transacao in transacoes)
+        
+        # Calcula a nova quantidade (multiplicando para desdobramento)
+        nova_quantidade = int(quantidade_total * fator_ajuste)
+        
+        # Calcula o novo preço
+        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
+        
+        # Marca todas as transações anteriores como inativas
+        cursor.execute("""
+            UPDATE transacoes_fii
+            SET ativo = 0
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            AND ativo = 1
+        """, (ticker, carteira_id, data_desdobramento))
+        
+        # Cria uma nova transação de desdobramento
+        cursor.execute("""
+            INSERT INTO transacoes_fii (
+                ticker, data_transacao, tipo_transacao, preco, quantidade, carteira_id, ativo
+            ) VALUES (?, ?, 'DESDOBRAMENTO', ?, ?, ?, 1)
+        """, (ticker, data_desdobramento, novo_preco, nova_quantidade, carteira_id))
         
         conn.commit()
         return {"mensagem": "Desdobramento aplicado com sucesso"}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao aplicar desdobramento: {str(e)}")
+        
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@router.post("/fii/agrupamento")
+async def aplicar_agrupamento_fii(
+    ticker: str = Query(..., description="Código do FII (ex: HGLG11)"),
+    data_agrupamento: str = Query(..., description="Data do agrupamento (dd/mm/yyyy)"),
+    proporcao_antes: int = Query(..., description="Proporção antes (ex: 10)"),
+    proporcao_depois: int = Query(..., description="Proporção depois (ex: 1)"),
+    carteira_id: int = Query(..., description="ID da carteira")
+):
+    """
+    Aplica um agrupamento em todas as transações de um FII até a data especificada.
+    Exemplo: agrupamento 10:1 (proporcao_antes=10, proporcao_depois=1)
+    """
+    # Validações básicas
+    if proporcao_antes <= 0 or proporcao_depois <= 0:
+        raise HTTPException(status_code=400, detail="Proporções devem ser maiores que zero")
+    
+    if proporcao_antes <= proporcao_depois:
+        raise HTTPException(status_code=400, detail="Proporção antes deve ser maior que proporção depois")
+    
+    # Normaliza o ticker
+    ticker = ticker.upper()
+    if not ticker.endswith('.SA'):
+        ticker += '.SA'
+    
+    # Valida e converte a data
+    try:
+        data_obj = datetime.strptime(data_agrupamento, '%d/%m/%Y')
+        data_agrupamento = data_obj.strftime('%Y-%m-%d')
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data deve estar no formato dd/mm/yyyy")
+    
+    try:
+        # Conecta ao banco
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        
+        # Busca todas as transações ativas do FII até a data do agrupamento
+        cursor.execute("""
+            SELECT id, quantidade, preco
+            FROM transacoes_fii
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            AND ativo = 1
+            ORDER BY data_transacao DESC
+        """, (ticker, carteira_id, data_agrupamento))
+        
+        transacoes = cursor.fetchall()
+        if not transacoes:
+            raise HTTPException(status_code=404, detail="Nenhuma transação encontrada para este FII até a data especificada")
+        
+        # Calcula o fator de ajuste
+        fator_ajuste = proporcao_depois / proporcao_antes
+        
+        # Soma todas as quantidades ativas
+        quantidade_total = sum(transacao[1] for transacao in transacoes)
+        
+        # Calcula a nova quantidade (dividindo para agrupamento)
+        nova_quantidade = int(quantidade_total * fator_ajuste)
+        
+        # Calcula o novo preço
+        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
+        
+        # Marca todas as transações anteriores como inativas
+        cursor.execute("""
+            UPDATE transacoes_fii
+            SET ativo = 0
+            WHERE ticker = ? 
+            AND carteira_id = ?
+            AND data_transacao <= ?
+            AND ativo = 1
+        """, (ticker, carteira_id, data_agrupamento))
+        
+        # Cria uma nova transação de agrupamento
+        cursor.execute("""
+            INSERT INTO transacoes_fii (
+                ticker, data_transacao, tipo_transacao, preco, quantidade, carteira_id, ativo
+            ) VALUES (?, ?, 'AGRUPAMENTO', ?, ?, ?, 1)
+        """, (ticker, data_agrupamento, novo_preco, nova_quantidade, carteira_id))
+        
+        conn.commit()
+        return {"mensagem": "Agrupamento aplicado com sucesso"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao aplicar agrupamento: {str(e)}")
         
     finally:
         if 'conn' in locals():
