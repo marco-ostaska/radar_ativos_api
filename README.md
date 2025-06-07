@@ -183,15 +183,25 @@ DELETE /transacoes/fii/deletar/{transacao_id}?carteira_id=1
 
 ### Carteira
 
-#### Visualizar Carteira de Ações
-```
-GET /carteira/acoes?carteira_id=1
-```
+#### Listar Carteira
+- **GET** `/carteira/acoes/{carteira_id}`
+  - Lista todas as ações de uma carteira específica
+  - Retorna: Lista de ações com quantidade, preço médio, preço atual, variação, valor investido, saldo, rendimento mensal estimado, DY e P/VP
 
-#### Visualizar Carteira de FIIs
-```
-GET /carteira/fii?carteira_id=1
-```
+- **GET** `/carteira/fii/{carteira_id}`
+  - Lista todos os FIIs de uma carteira específica
+  - Retorna: Lista de FIIs com quantidade, preço médio, preço atual, variação, valor investido, saldo, rendimento mensal estimado, DY e P/VP
+
+#### Deletar Carteira
+- **DELETE** `/carteira/acoes/delete?carteira_id={id}`
+  - Deleta todas as transações de uma carteira de ações
+  - Retorna: Mensagem com quantidade de transações deletadas
+  - Erro 404: Se não existirem transações para a carteira
+
+- **DELETE** `/carteira/fii/delete?carteira_id={id}`
+  - Deleta todas as transações de uma carteira de FII
+  - Retorna: Mensagem com quantidade de transações deletadas
+  - Erro 404: Se não existirem transações para a carteira
 
 ## Docker
 
