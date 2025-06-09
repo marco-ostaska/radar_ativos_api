@@ -13,7 +13,7 @@ router = APIRouter(
 async def criar_transacao(transacao: TransacaoAcaoCriar):
     """
     Cria uma nova transação de ação.
-    
+
     - **ticker**: Código da ação
     - **data_transacao**: Data da transação (dd/mm/yyyy)
     - **tipo_transacao**: COMPRA ou VENDA
@@ -28,7 +28,7 @@ async def criar_transacao(transacao: TransacaoAcaoCriar):
 async def listar_transacoes(ticker: Optional[str] = Query(None, description="Filtrar por ticker")):
     """
     Lista todas as transações de ações, opcionalmente filtradas por ticker.
-    
+
     - **ticker**: (opcional) Código da ação para filtrar
     """
     service = TransacaoAcaoService()
@@ -38,7 +38,7 @@ async def listar_transacoes(ticker: Optional[str] = Query(None, description="Fil
 async def buscar_transacao(transacao_id: int):
     """
     Busca uma transação pelo ID.
-    
+
     - **transacao_id**: ID da transação
     """
     service = TransacaoAcaoService()
@@ -51,7 +51,7 @@ async def buscar_transacao(transacao_id: int):
 async def atualizar_transacao(transacao_id: int, transacao: TransacaoAcaoCriar):
     """
     Atualiza uma transação existente.
-    
+
     - **transacao_id**: ID da transação
     - **ticker**: Código da ação
     - **data_transacao**: Data da transação (dd/mm/yyyy)
@@ -70,7 +70,7 @@ async def atualizar_transacao(transacao_id: int, transacao: TransacaoAcaoCriar):
 async def deletar_transacao(transacao_id: int):
     """
     Deleta uma transação.
-    
+
     - **transacao_id**: ID da transação
     """
     service = TransacaoAcaoService()
@@ -87,16 +87,16 @@ async def aplicar_desdobramento(
 ):
     """
     Aplica um desdobramento nas transações de uma ação.
-    
+
     - **ticker**: Código da ação
     - **data_desdobramento**: Data do desdobramento (dd/mm/yyyy)
     - **proporcao_antes**: Proporção antes do desdobramento (ex: 1)
     - **proporcao_depois**: Proporção depois do desdobramento (ex: 10)
-    
+
     Exemplo: Para um desdobramento 10:1 (10 para 1):
     - proporcao_antes = 1
     - proporcao_depois = 10
-    
+
     Isso irá:
     1. Multiplicar as quantidades por 10
     2. Dividir os preços por 10
@@ -105,4 +105,4 @@ async def aplicar_desdobramento(
     service = TransacaoAcaoService()
     if not service.aplicar_desdobramento(ticker, data_desdobramento, proporcao_antes, proporcao_depois):
         raise HTTPException(status_code=404, detail="Ação não encontrada")
-    return {"message": "Desdobramento aplicado com sucesso"} 
+    return {"message": "Desdobramento aplicado com sucesso"}
