@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Path
 from app.services.acoes import Acao
 from app.services.fii import FII
+from app.services.fii_detalhe import FiiDetalhe
 import sqlite3
 import os
 
@@ -8,6 +9,8 @@ router = APIRouter(
     prefix="/carteira",
     tags=["Carteira"]
 )
+
+fii_detalhe = FiiDetalhe()
 
 @router.get("/acoes")
 async def obter_carteira_acoes(
@@ -176,6 +179,19 @@ async def obter_carteira_fii(
             # Calcula rendimento mensal estimado
             rendimento_mensal = (fii.dividendo_estimado * quantidade)
             
+            # Get radar data for recommendation
+            radar_data = fii_detalhe.get_radar(ticker)
+            
+            # Implement recommendation logic
+            if radar_data['comprar'] and radar_data['potencial'] > 10:
+                recomendacao = "COMPRAR ou APORTAR"
+            elif radar_data['potencial'] < -15 and radar_data['spread_usado'] < 2:
+                recomendacao = "VENDER ou realizar parcial"
+            elif radar_data['spread_usado'] < 3 or radar_data['potencial'] < 0:
+                recomendacao = "MANTER com cautela"
+            else:
+                recomendacao = "MANTER"
+            
             resultado.append({
                 "ticker": ticker,
                 "quantidade": quantidade,
@@ -186,7 +202,8 @@ async def obter_carteira_fii(
                 "saldo": round(saldo, 2),
                 "rendimento_mensal_estimado": round(rendimento_mensal, 2),
                 "dy": round(fii.dividend_yield * 100, 2),
-                "pvp": round(fii.pvp, 2)
+                "pvp": round(fii.pvp, 2),
+                "recomendacao": recomendacao
             })
         
         return resultado
@@ -260,4 +277,4 @@ async def deletar_carteira_fii(
         
     finally:
         if 'conn' in locals():
-            conn.close() 
+            conn.close()
