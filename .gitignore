@@ -37,3 +37,4 @@ Thumbs.db
 
 .devcontainer
 .env
+sqlite/radar_ativos.db
