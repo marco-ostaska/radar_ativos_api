@@ -178,8 +178,8 @@ async def adicionar_transacao_fii(
         # Insere a transação
         cursor.execute("""
             INSERT INTO transacoes_fii (
-                ticker, data_transacao, tipo_transacao, preco, quantidade, carteira_id
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                ticker, data_transacao, tipo_transacao, preco, quantidade, carteira_id, ativo
+            ) VALUES (?, ?, ?, ?, ?, ?, 1)
         """, (ticker, data_transacao, tipo, preco, quantidade, carteira_id))
         
         conn.commit()
@@ -287,8 +287,7 @@ def atualizar_transacao_acao(
                 data_transacao = ?,
                 tipo_transacao = ?,
                 preco = ?,
-                quantidade = ?,
-                data_atualizacao = CURRENT_TIMESTAMP
+                quantidade = ?
             WHERE id = ? AND carteira_id = ?
         """, (ticker, data_formatada, tipo, preco, quantidade, transacao_id, carteira_id))
         conn.commit()
@@ -349,8 +348,7 @@ def atualizar_transacao_fii(
                 data_transacao = ?,
                 tipo_transacao = ?,
                 preco = ?,
-                quantidade = ?,
-                data_atualizacao = CURRENT_TIMESTAMP
+                quantidade = ?
             WHERE id = ? AND carteira_id = ?
         """, (ticker, data_formatada, tipo, preco, quantidade, transacao_id, carteira_id))
         conn.commit()

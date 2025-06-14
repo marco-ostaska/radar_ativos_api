@@ -115,6 +115,7 @@ async def obter_carteira_acoes(
 async def obter_carteira_fii(
     carteira_id: int = Query(..., description="ID da carteira")
 ):
+    print("Obtendo carteira de FII")
     try:
         # Conecta ao banco
         conn = sqlite3.connect('sqlite/radar_ativos.db')
