@@ -154,7 +154,6 @@ async def adicionar_transacao_fii(
         ticker += '.SA'
     fii = FII(ticker)
         # DEBUG: print info for investigation
-    print(f"DEBUG FII info for {ticker}: {fii.info}")
     if not fii.cotacao or fii.cotacao <= 0:
         raise HTTPException(status_code=400, detail="FII não encontrado ou ticker inválido")
     
@@ -329,7 +328,6 @@ def atualizar_transacao_fii(
         ticker += '.SA'
     fii = FII(ticker)
     # DEBUG: print info for investigation
-    print(f"DEBUG FII info for {ticker}: {fii.info}")
     if not fii.cotacao or fii.cotacao <= 0:
         raise HTTPException(status_code=400, detail="FII não encontrado ou ticker inválido")
 
