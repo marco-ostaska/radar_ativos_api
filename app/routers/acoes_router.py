@@ -26,7 +26,8 @@ def obter_detalhes_acao(ticker: str = Query(..., description="Ticker da ação, 
         base = acao.calcular_teto_cotacao_lucro() or teto_dy_valor
         potencial = round(((base - acao.cotacao) / acao.cotacao) * 100, 2)
         nota_risco = 11 - acao.risco_geral
-        score_valor = score_acao.evaluate_company(acao.acao, indice_base)
+        score_valor = score_acao.evaluate_company(acao, indice_base)
+
         cota_necessaria = round(1000 / ((acao.dy_estimado * acao.cotacao) / 12), 0) if acao.dy_estimado else 0
         investimento_necessario = cota_necessaria * acao.cotacao
         
@@ -78,7 +79,7 @@ def obter_dados_acao(ticker: str = Query(..., description="Ticker da ação, ex:
         base = acao.calcular_teto_cotacao_lucro() or teto_dy_valor
         potencial = round(((base - acao.cotacao) / acao.cotacao) * 100, 2)
         nota_risco = 11 - acao.risco_geral
-        score_valor = score_acao.evaluate_company(acao.acao, indice_base)
+        score_valor = score_acao.evaluate_company(acao, indice_base)
         criteria_sum = (sum([
             (acao.calcular_teto_cotacao_lucro() or 0) > acao.cotacao,
             teto_dy_valor > acao.cotacao,
