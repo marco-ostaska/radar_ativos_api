@@ -33,9 +33,10 @@ class Acao:
         self.income_stmt = pd.DataFrame.from_dict(dados["income_stmt"], orient="index")
         self.adj_close = pd.DataFrame.from_dict(dados["adj_close"], orient="index")
 
-    def media_ponderada_fechamento(self, ano: int) -> float:
+    def media_ponderada_fechamento(self, ano: int) -> float | None:
         #return trim_mean(self.adj_close.loc[f"{ano}-"].tail(30).values, proportiontocut=0.1)
         mask = pd.to_datetime(self.adj_close.index).year == ano
+      
         return trim_mean(self.adj_close.loc[mask].tail(30).values, proportiontocut=0.1)
 
 
@@ -46,7 +47,7 @@ class Acao:
         print("datas:", datas)
         lucros = list(income.values)
         print("lucros:", lucros)
-        cotacoes = [float(self.media_ponderada_fechamento(ano)[0]) for ano in datas]
+        cotacoes = [self.media_ponderada_fechamento(ano) for ano in datas]
         print("cotacoes:", cotacoes)
         datas, lucros, cotacoes = datas[::-1], lucros[::-1], cotacoes[::-1]
 
@@ -151,7 +152,7 @@ class Acao:
 
 
 def main():
-    ativo = Acao("CMIG4.SA")
+    ativo = Acao("VALE3.SA")
     
     print("Ticker:", ativo.ticker)
     print("Cotação:", ativo.cotacao)
