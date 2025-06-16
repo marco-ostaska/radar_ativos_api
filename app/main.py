@@ -9,7 +9,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 🔓 Libera requisições do front-end React
+# Libera requisições do front-end React
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],  # Ou ["*"] se quiser liberar tudo no dev
@@ -18,7 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🚀 Rotas
+# Rotas
 app.include_router(acoes_router.router)
 app.include_router(fii_router.router)
 app.include_router(indicadores_admin_router.router)

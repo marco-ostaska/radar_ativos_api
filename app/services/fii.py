@@ -1,20 +1,44 @@
-from datetime import datetime
-
+import pandas as pd
 import numpy as np
 import yfinance as yf
-
 from app.services.investidor10 import Investidor10Service
+from app.utils.redis_cache import get_cached_data
+from datetime import datetime
 
 
 class FII:
-    """
-    Classe para manipular dados de um Fundo Imobiliário (FII).
-    """
-
     def __init__(self, ticker: str):
         self.ticker = ticker.upper()
-        self.fii = yf.Ticker(self.ticker)
+
+        def fetch_data():
+            ticker_obj = yf.Ticker(self.ticker)
+            return {
+                "info": ticker_obj.info,
+                "balance_sheet": ticker_obj.balance_sheet.to_dict(),
+                "dividends": {
+                    str(k.date()): float(v)
+                    for k, v in ticker_obj.dividends.items()
+                },
+            }
+
+        dados = get_cached_data(f"fii:{self.ticker}", 900, fetch_data)
+        self._info = dados["info"]
+        self._balance_sheet = pd.DataFrame(dados["balance_sheet"])
+        self._dividends = pd.Series(dados["dividends"])
         self._i10_service = None
+
+    @property
+    def info(self):
+        return self._info
+
+    @property
+    def balance_sheet(self):
+        return self._balance_sheet
+
+    @property
+    def dividends(self):
+        return self._dividends
+
 
 
     @property
@@ -24,21 +48,18 @@ class FII:
             self._i10_service = Investidor10Service(ticker)
         return self._i10_service
 
-    @property
-    def info(self):
-        return self.fii.info
 
     @property
     def valor_patrimonial(self):
-        if 'Total Equity Gross Minority Interest' not in self.fii.balance_sheet.index:
+        if 'Total Equity Gross Minority Interest' not in self.balance_sheet.index:
             return None
-        return self.fii.balance_sheet.loc['Total Equity Gross Minority Interest'].head(1).values[0]
+        return self.balance_sheet.loc['Total Equity Gross Minority Interest'].head(1).values[0]
 
     @property
     def cotas_emitidas(self):
-        if 'Ordinary Shares Number' not in self.fii.balance_sheet.index:
+        if 'Ordinary Shares Number' not in self.balance_sheet.index:
             return None
-        valor = self.fii.balance_sheet.loc['Ordinary Shares Number'].head(1).values[0]
+        valor = self.balance_sheet.loc['Ordinary Shares Number'].head(1).values[0]
         if np.isnan(valor):
             return None
         return valor
@@ -60,9 +81,6 @@ class FII:
     def pvp(self):
         return round(self.cotacao / self.vpa, 2)
 
-    @property
-    def dividends(self):
-        return self.fii.dividends
 
     @property
     def dividend_yield(self):
