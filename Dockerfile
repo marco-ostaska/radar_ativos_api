@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+# Configura o timezone para Brasil (America/Sao_Paulo)
+ENV TZ=America/Sao_Paulo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Cria usuário e grupo 'radar'
 RUN groupadd -r radar && useradd --no-log-init -r -g radar radar
 
