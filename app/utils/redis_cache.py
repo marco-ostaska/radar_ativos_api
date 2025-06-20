@@ -43,7 +43,7 @@ def serialize(obj):
             pass
     return obj
 
-def get_cached_data(key: str, ttl: int, fetch_fn):
+def get_cached_data(key: str, ttl: int = None, fetch_fn=None):
     value = redis_client.get(key)
     if value:
         print(f"[CACHE] HIT for {key}")
@@ -56,5 +56,8 @@ def get_cached_data(key: str, ttl: int, fetch_fn):
         result = serialize(result)
 
     print(f"[CACHE] SET for {key}")
-    redis_client.setex(key, ttl, json.dumps(result))
+    if ttl is None:
+        redis_client.set(key, json.dumps(result))
+    else:
+        redis_client.setex(key, ttl, json.dumps(result))
     return result
