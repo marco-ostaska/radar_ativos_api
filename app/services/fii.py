@@ -15,6 +15,8 @@ class FII:
 
         def fetch_data():
             ticker_obj = yf.Ticker(self.ticker)
+            ticker_base = self.ticker.split(".")[0]
+            i10_service = Investidor10Service(ticker_base)
             return {
                 "info": ticker_obj.info,
                 "balance_sheet": ticker_obj.balance_sheet.to_dict(),
@@ -22,6 +24,7 @@ class FII:
                     str(k.date()): float(v)
                     for k, v in ticker_obj.dividends.items()
                 },
+                "i10_segmento": i10_service.get_segmento()
             }
 
         dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update)
@@ -29,6 +32,7 @@ class FII:
         self._balance_sheet = pd.DataFrame(dados["balance_sheet"])
         self._dividends = pd.Series(dados["dividends"])
         self._i10_service = None
+        self._i10_segmento = dados.get("i10_segmento")
 
     @property
     def info(self):
@@ -48,6 +52,10 @@ class FII:
             ticker = self.ticker.split(".")[0]
             self._i10_service = Investidor10Service(ticker)
         return self._i10_service
+
+    @property
+    def i10_segmento(self):
+        return self._i10_segmento
 
     @property
     def valor_patrimonial(self):
