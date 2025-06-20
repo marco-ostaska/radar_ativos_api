@@ -1,53 +1,51 @@
 from datetime import datetime, timedelta
-from app.db.banco_central_db import BancoCentralDB
 from app.services.banco_central import SELIC, IPCA
+from app.utils.redis_cache import get_cached_data
+import json
 
 class IndiceRefresher:
     """
-    Serviço para gerenciar índices: busca no SQLite ou atualiza via Banco Central.
+    Serviço para gerenciar índices: busca no Redis ou atualiza via Banco Central.
     """
 
     def __init__(self):
-        self.repo = BancoCentralDB()
-        self.cache_dias_valido = 30  # dias para considerar o cache válido
+        self.cache_key = "indices_bcb"
 
     def get_indices(self, force_update: bool = False) -> dict:
         """
-        Obtém índices atualizados. Se necessário, atualiza a partir do Banco Central.
+        Obtém índices do Redis, atualizando apenas se forçado.
 
         :param force_update: Se True, força atualização dos dados do Banco Central
         :return: Dicionário com índices (selic, ipca, etc)
         """
-        if not force_update:
-            indices_dict = self.repo.get_indices()  # Novo formato: {indice: {valor, data_atualizacao}}
-            if indices_dict:
-                # Vamos pegar a data mais recente entre os índices
-                datas = [datetime.strptime(v["data_atualizacao"], "%Y-%m-%d %H:%M:%S") for v in indices_dict.values() if v.get("data_atualizacao")]
-                if datas:
-                    data_cache = max(datas)
-                    if datetime.now() - data_cache < timedelta(days=self.cache_dias_valido):
-                        return {k: v["valor"] for k, v in indices_dict.items()}
-
-        # Atualizar via API se necessário
-        try:
+        def fetch_indices():
             selic = SELIC(5)
             ipca = IPCA(5)
             ipca_atual = IPCA(1)
-
             novo_indices = {
                 "selic": selic.media_ganho_real(),
                 "selic_atual": selic.atual(),
                 "ipca": ipca.media_ganho_real(),
                 "ipca_media5": ipca.media_anual(),
                 "ipca_atual": ipca_atual.media_anual(),
+                "data_atualizacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
+            return novo_indices
 
-            self.repo.save_indices(novo_indices)
-            indices_atualizados = self.repo.get_indices()
-            return {k: v["valor"] for k, v in indices_atualizados.items()}
+        from app.utils.redis_cache import redis_client
 
-        except Exception as e:
-            raise RuntimeError(f"Erro ao atualizar índices: {str(e)}")
+        if not force_update:
+            value = redis_client.get(self.cache_key)
+            if value:
+                print(f"[CACHE] HIT for {self.cache_key}")
+                indices_dict = json.loads(value)
+                return {k: v for k, v in indices_dict.items() if k != "data_atualizacao"}
+
+        # Força atualização
+        print(f"[CACHE] FORCE UPDATE for {self.cache_key}")
+        indices_dict = fetch_indices()
+        redis_client.set(self.cache_key, json.dumps(indices_dict))
+        return {k: v for k, v in indices_dict.items() if k != "data_atualizacao"}
 
     def melhor_indice(self) -> float:
         """
