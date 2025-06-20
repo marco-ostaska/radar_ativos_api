@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+# Cria usuário e grupo 'radar'
+RUN groupadd -r radar && useradd --no-log-init -r -g radar radar
+
 WORKDIR /radar
 
 
@@ -16,7 +19,10 @@ RUN pip install --no-cache-dir  --upgrade pip \
 
 COPY app /radar/app
 
-COPY sqlite /radar/sqlite 
+# Ajusta permissões para o usuário 'radar'
+RUN chown -R radar:radar /radar
+
+USER radar
 
 EXPOSE 8000
 

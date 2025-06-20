@@ -1,10 +1,13 @@
 import redis
 import json
-import logging
+import os
 import pandas as pd
 
 # Conexão com Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", 6379))
+redis_db = int(os.getenv("REDIS_DB", 0))
+redis_client = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
 def _safe_dict(df: pd.DataFrame) -> dict:
     df = df.copy()
