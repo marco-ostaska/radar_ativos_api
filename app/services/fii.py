@@ -17,6 +17,8 @@ class FII:
             ticker_obj = yf.Ticker(self.ticker)
             ticker_base = self.ticker.split(".")[0]
             i10_service = Investidor10Service(ticker_base)
+            from app.services.fiiscom import FiisComService
+            fiiscom_data = FiisComService(ticker_base).dados
             return {
                 "info": ticker_obj.info,
                 "balance_sheet": ticker_obj.balance_sheet.to_dict(),
@@ -24,7 +26,8 @@ class FII:
                     str(k.date()): float(v)
                     for k, v in ticker_obj.dividends.items()
                 },
-                "i10_segmento": i10_service.get_segmento()
+                "i10_segmento": i10_service.get_segmento(),
+                "fiiscom": fiiscom_data
             }
 
         dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update)
@@ -33,6 +36,7 @@ class FII:
         self._dividends = pd.Series(dados["dividends"])
         self._i10_service = None
         self._i10_segmento = dados.get("i10_segmento")
+        self._fiiscom_data = dados.get("fiiscom")
 
     @property
     def info(self):
@@ -58,6 +62,10 @@ class FII:
         return self._i10_segmento
 
     @property
+    def fiiscom(self):
+        return self._fiiscom_data
+
+    @property
     def valor_patrimonial(self):
         if 'Total Equity Gross Minority Interest' not in self.balance_sheet.index:
             return None
@@ -74,10 +82,26 @@ class FII:
 
     @property
     def vpa(self):
-        if self.valor_patrimonial is None or self.cotas_emitidas is None:
-            i10 = self.i10_service
-            return round(self.cotacao / i10.get_pvp(), 2)
-        return round(self.valor_patrimonial / self.cotas_emitidas, 2)
+        vpa_i10 = None
+        vpa_fiiscom = None
+        try:
+            vpa_i10 = self.i10_service.get_vpa()
+        except Exception:
+            pass
+        try:
+            vpa_fiiscom = self.fiiscom.get("Val. Patrimonial p/Cota")
+            if vpa_fiiscom:
+                vpa_fiiscom = float(vpa_fiiscom.replace(",", "."))
+        except Exception:
+            pass
+
+        vpas = [v for v in [vpa_i10, vpa_fiiscom] if v is not None]
+        if vpas:
+            return min(vpas)
+        # Cálculo antigo (Yahoo) mantido apenas para referência:
+        # if self.valor_patrimonial is not None and self.cotas_emitidas is not None:
+        #     return round(self.valor_patrimonial / self.cotas_emitidas, 2)
+        return None
 
     @property
     def cotacao(self):
@@ -87,7 +111,7 @@ class FII:
 
     @property
     def pvp(self):
-        return round(self.cotacao / self.vpa, 2)
+        return round(self.cotacao / self.vpa, 2) if self.vpa else None
 
     @property
     def dividend_yield(self):
@@ -223,7 +247,7 @@ class FII:
             "melhor_indice": indice_base,
             "ticker": ativo.ticker.split(".")[0],
             "cotacao": round(ativo.cotacao, 2),
-            "vpa": round(ativo.vpa, 2),
+            "vpa": round(ativo.vpa, 2) if ativo.vpa else None,
             "teto_div": round(teto_div, 2),
             "dy_estimado": round(dy_estimado, 2),
             "rendimento_real": round(real, 2),
@@ -264,10 +288,10 @@ class FII:
             "cotacao": round(ativo.cotacao, 2),
             "valor_patrimonial": round(ativo.valor_patrimonial, 2) if ativo.valor_patrimonial else None,
             "cotas_emitidas": int(ativo.cotas_emitidas) if ativo.cotas_emitidas else None,
-            "vpa": round(ativo.vpa, 2),
-            "pvp": round(ativo.pvp, 2),
-            "dividend_yield": round(ativo.dividend_yield * 100, 2),
-            "dividendo_estimado": round(ativo.dividendo_estimado, 2),
+            "vpa": round(ativo.vpa, 2) if ativo.vpa else None,
+            "pvp": round(ativo.pvp, 2) if ativo.pvp else None,
+            "dividend_yield": round(ativo.dividend_yield * 100, 2) if ativo.dividend_yield else None,
+            "dividendo_estimado": round(ativo.dividendo_estimado, 2) if ativo.dividendo_estimado else None,
             "dy_estimado": round(dy_estimado, 2),
             "teto_div": round(teto_div, 2),
             "rendimento_real": round(real, 2),
