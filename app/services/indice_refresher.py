@@ -32,19 +32,9 @@ class IndiceRefresher:
             }
             return novo_indices
 
-        from app.utils.redis_cache import redis_client
+        from app.utils.redis_cache import get_cached_data
 
-        if not force_update:
-            value = redis_client.get(self.cache_key)
-            if value:
-                print(f"[CACHE] HIT for {self.cache_key}")
-                indices_dict = json.loads(value)
-                return {k: v for k, v in indices_dict.items() if k != "data_atualizacao"}
-
-        # Força atualização
-        print(f"[CACHE] FORCE UPDATE for {self.cache_key}")
-        indices_dict = fetch_indices()
-        redis_client.set(self.cache_key, json.dumps(indices_dict))
+        indices_dict = get_cached_data(self.cache_key, None, fetch_indices, force=force_update)
         return {k: v for k, v in indices_dict.items() if k != "data_atualizacao"}
 
     def melhor_indice(self) -> float:

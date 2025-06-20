@@ -43,13 +43,14 @@ def serialize(obj):
             pass
     return obj
 
-def get_cached_data(key: str, ttl: int = None, fetch_fn=None):
-    value = redis_client.get(key)
-    if value:
-        print(f"[CACHE] HIT for {key}")
-        return json.loads(value)
+def get_cached_data(key: str, ttl: int = None, fetch_fn=None, force: bool = False):
+    if not force:
+        value = redis_client.get(key)
+        if value:
+            print(f"[CACHE] HIT for {key}")
+            return json.loads(value)
 
-    print(f"[CACHE] MISS for {key}")
+    print(f"[CACHE] MISS{' (FORCE)' if force else ''} for {key}")
     result = fetch_fn()
 
     if isinstance(result, dict):

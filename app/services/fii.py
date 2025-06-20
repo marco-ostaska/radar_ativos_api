@@ -4,10 +4,13 @@ import yfinance as yf
 from app.services.investidor10 import Investidor10Service
 from app.utils.redis_cache import get_cached_data
 from datetime import datetime
-
+from app.db.indicadores_ativos_db import IndicadoresAtivosDB
+from app.services.banco_central import SELIC, IPCA
+from app.services.indice_refresher import IndiceRefresher
+from app.services import score_fii
 
 class FII:
-    def __init__(self, ticker: str):
+    def __init__(self, ticker: str, force_update: bool = False):
         self.ticker = ticker.upper()
 
         def fetch_data():
@@ -21,7 +24,7 @@ class FII:
                 },
             }
 
-        dados = get_cached_data(f"fii:{self.ticker}", 900, fetch_data)
+        dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update)
         self._info = dados["info"]
         self._balance_sheet = pd.DataFrame(dados["balance_sheet"])
         self._dividends = pd.Series(dados["dividends"])
@@ -39,15 +42,12 @@ class FII:
     def dividends(self):
         return self._dividends
 
-
-
     @property
     def i10_service(self):
         if self._i10_service is None:
             ticker = self.ticker.split(".")[0]
             self._i10_service = Investidor10Service(ticker)
         return self._i10_service
-
 
     @property
     def valor_patrimonial(self):
@@ -80,7 +80,6 @@ class FII:
     @property
     def pvp(self):
         return round(self.cotacao / self.vpa, 2)
-
 
     @property
     def dividend_yield(self):
@@ -122,7 +121,6 @@ class FII:
         if market_cap < 500_000_000:
             return 5
         return 1
-
 
     @property
     def risco_preco_volatilidade(self):
@@ -177,46 +175,130 @@ class FII:
         i10 = self.i10_service
         return i10.get_segmento()
 
+    @staticmethod
+    def risco_operacional(tipo: str) -> int:
+        db = IndicadoresAtivosDB()
+        risco = db.get_risco(tipo)
+        return risco if risco is not None else 10
 
+    def get_radar(self) -> dict:
+        indices_service = IndiceRefresher()
+        db = IndicadoresAtivosDB()
 
+        ticker = self.ticker
+        if not ticker.endswith(".SA"):
+            ticker += ".SA"
 
+        ativo = self
+        tipo = ativo.i10_service.get_segmento()
+        spread = db.get_spread(tipo)
+        indice_base = indices_service.melhor_indice()
+        spread_total = spread + indice_base
+        indices = indices_service.get_indices()
+
+        dy_estimado = (ativo.dividendo_estimado * 100) / ativo.cotacao
+        teto_div = ativo.dividendo_estimado / spread_total * 100
+        real = dy_estimado - indices["ipca_atual"]
+        potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
+        risco = round(11 - ativo.overall_risk(FII.risco_operacional(tipo)), 1)
+        score = score_fii.evaluate_fii(ativo, indice_base)
+        criteria_sum = sum([
+            ativo.vpa > ativo.cotacao,
+            teto_div > ativo.cotacao,
+            real > (indices["selic_atual"] - indices["ipca_atual"]),
+        ])
+        comprar = int(criteria_sum) == 3
+
+        return {
+            "tipo": tipo,
+            "spread": round(spread, 4),
+            "melhor_indice": indice_base,
+            "ticker": ativo.ticker.split(".")[0],
+            "cotacao": round(ativo.cotacao, 2),
+            "vpa": round(ativo.vpa, 2),
+            "teto_div": round(teto_div, 2),
+            "dy_estimado": round(dy_estimado, 2),
+            "rendimento_real": round(real, 2),
+            "potencial": potencial,
+            "nota_risco": risco,
+            "score": score,
+            "indice_base": indice_base,
+            "spread_usado": spread_total,
+            "criteria_sum": int(criteria_sum),
+            "comprar": bool(comprar),
+        }
+
+    def get_detalhado(self) -> dict:
+        indices_service = IndiceRefresher()
+        db = IndicadoresAtivosDB()
+
+        ticker = self.ticker
+        if not ticker.endswith(".SA"):
+            ticker += ".SA"
+
+        ativo = self
+        tipo = ativo.i10_service.get_segmento()
+        spread = db.get_spread(tipo)
+        indice_base = indices_service.melhor_indice()
+        spread_total = spread + indice_base
+        indices = indices_service.get_indices()
+
+        dy_estimado = (ativo.dividendo_estimado * 100) / ativo.cotacao
+        teto_div = ativo.dividendo_estimado / spread_total * 100
+        real = dy_estimado - indices["ipca_atual"]
+        potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
+        risco = round(11 - ativo.overall_risk(FII.risco_operacional(tipo)), 1)
+        cotas_necessarias = round(12000 / ativo.dividendo_estimado, 2)
+        investimento_necessario = round(cotas_necessarias * ativo.cotacao, 2)
+
+        return {
+            "ticker": ativo.ticker.split(".")[0],
+            "cotacao": round(ativo.cotacao, 2),
+            "valor_patrimonial": round(ativo.valor_patrimonial, 2) if ativo.valor_patrimonial else None,
+            "cotas_emitidas": int(ativo.cotas_emitidas) if ativo.cotas_emitidas else None,
+            "vpa": round(ativo.vpa, 2),
+            "pvp": round(ativo.pvp, 2),
+            "dividend_yield": round(ativo.dividend_yield * 100, 2),
+            "dividendo_estimado": round(ativo.dividendo_estimado, 2),
+            "dy_estimado": round(dy_estimado, 2),
+            "teto_div": round(teto_div, 2),
+            "rendimento_real": round(real, 2),
+            "potencial": potencial,
+            "risco_liquidez": ativo.risco_liquidez,
+            "risco_tamanho": ativo.risco_tamanho,
+            "risco_preco_volatilidade": ativo.risco_preco_volatilidade,
+            "risco_rendimento": ativo.risco_rendimento,
+            "nota_risco": risco,
+            "indice_base": indice_base,
+            "spread": round(spread, 4),
+            "spread_usado": spread_total,
+            "historico_dividendos": {k: round(v, 4) for k, v in ativo.historico_dividendos.items()},
+            "raw_dividends": ativo.dividends.tail(12).to_dict(),
+            "cotas_necessarias_para_1000_mensais": cotas_necessarias,
+            "investimento_necessario_para_1000_mensais": investimento_necessario
+        }
 
 def convert_unix_date(unix_date: int) -> str:
-    """
-    Converte uma data em formato Unix timestamp para string no formato dd/mm.
-    """
     date_time = datetime.fromtimestamp(unix_date)
     return date_time.strftime('%d/%m')
 
-
 def get_investidor10(ticker: str) -> Investidor10Service:
-    """
-    Inicializa scraping no Investidor10 a partir do ticker.
-    """
     ticker = ticker.split(".")[0]
     return Investidor10Service(ticker)
 
-
 def main():
+    fii = FII('VGIA11.SA', force_update=True)
+    print("\n--- Teste: RADAR (cache) ---")
+    print(fii.get_radar())
+
+    
+    print("\n--- Teste: RADAR (forçando refresh) ---")
+    print(fii.get_radar())
+
     fii = FII('VGIA11.SA')
 
-    print(f"Ticker: {fii.ticker}")
-    print(f"Valor Patrimonial: {fii.valor_patrimonial}")
-    print(f"Cotas Emitidas: {fii.cotas_emitidas}")
-    print(f"VPA: {fii.vpa}")
-    print(f"Cotação: {fii.cotacao}")
-    print(f"P/VP: {fii.pvp}")
-    print(f"Dividend Yield: {fii.dividend_yield}")
-    print(f"Dividendo estimado: {fii.dividendo_estimado}")
-    print(f"Risco de Liquidez: {fii.risco_liquidez}")
-    print(f"Risco de Tamanho: {fii.risco_tamanho}")
-    print(f"Risco de Preço e Volatilidade: {fii.risco_preco_volatilidade}")
-    print(f"Risco de Rendimento: {fii.risco_rendimento}")
-    print(f"Overall Risk: {fii.overall_risk(10)}")
-    print(f"Histórico de Dividendos: {fii.historico_dividendos}")
-    print(f"Segmento: {fii.segmento()}")
-    # print(fii.info) # para debug completo
-
+    print("\n--- Teste: DETALHADO ---")
+    print(fii.get_detalhado())
 
 if __name__ == "__main__":
     main()
