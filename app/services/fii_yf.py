@@ -146,7 +146,7 @@ class FIIYahooService:
             return 10
 
 if __name__ == "__main__":
-    ticker = "FGAA11.SA"
+    ticker = "tgar11.SA"
     fii = FIIYahooService(ticker, True)
     print(f"Ticker: {ticker}")
     print("Info:", fii.info)

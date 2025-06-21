@@ -138,7 +138,7 @@ def main():
     Testa a coleta de dados de um FII via Investidor10 usando requests.
     """
     try:
-        fii_scraper = Investidor10Service("HSML11")  # Exemplo de ticker, substitua conforme necessário
+        fii_scraper = Investidor10Service("tgar11")  # Exemplo de ticker, substitua conforme necessário
 
         cotacao = fii_scraper.get_cotacao()
         dy = fii_scraper.get_dividend_yield()

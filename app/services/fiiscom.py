@@ -326,7 +326,7 @@ class FiisComService:
             return 10
 
 if __name__ == "__main__":
-    fii = FiisComService("fgaa11", True)
+    fii = FiisComService("tgar11", True)
     print("Nome:", fii.nome)
     print("Descrição:", fii.descricao)
     print("Cotação:", fii.cotacao)

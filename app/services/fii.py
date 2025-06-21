@@ -157,10 +157,10 @@ class FII:
         spread_total = spread + indice_base
         indices = indices_service.get_indices()
 
-        dy_estimado = ativo.dividendo_estimado
-        teto_div = (ativo.dividendo_estimado/12) / spread_total * 100
+        dy_estimado = (ativo.dividendo_estimado /12) / ativo.cotacao * 100
+        teto_div = (ativo.dividendo_estimado /12) / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
-        potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
+        potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao), 2)
         risco = round(11 - ativo.overall_risk(),1)
         score = evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
@@ -209,7 +209,7 @@ class FII:
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
         risco = round(11 - ativo.overall_risk(), 1)
-        cotas_necessarias = round(12000 / ativo.dividendo_estimado, 2)
+        cotas_necessarias = round(1000 / ativo.dividendo_estimado, 2)
         investimento_necessario = round(cotas_necessarias * ativo.cotacao, 2)
 
         return {
