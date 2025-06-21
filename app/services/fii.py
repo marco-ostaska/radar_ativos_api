@@ -8,17 +8,21 @@ from app.db.indicadores_ativos_db import IndicadoresAtivosDB
 from app.services.banco_central import SELIC, IPCA
 from app.services.indice_refresher import IndiceRefresher
 from app.services import score_fii
+from app.services.fiiscom import FiisComService
 
 class FII:
     def __init__(self, ticker: str, force_update: bool = False):
         self.ticker = ticker.upper()
+        print(f"[FII] Inicializando com ticker: {self.ticker}")
+        self.fiiscom = FiisComService(ticker.split(".")[0].lower())
 
         def fetch_data():
             ticker_obj = yf.Ticker(self.ticker)
             ticker_base = self.ticker.split(".")[0]
             i10_service = Investidor10Service(ticker_base)
-            from app.services.fiiscom import FiisComService
-            fiiscom_data = FiisComService(ticker_base).dados
+
+            
+            
             return {
                 "info": ticker_obj.info,
                 "balance_sheet": ticker_obj.balance_sheet.to_dict(),
@@ -27,7 +31,6 @@ class FII:
                     for k, v in ticker_obj.dividends.items()
                 },
                 "i10_segmento": i10_service.get_segmento(),
-                "fiiscom": fiiscom_data
             }
 
         dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update)
@@ -36,7 +39,7 @@ class FII:
         self._dividends = pd.Series(dados["dividends"])
         self._i10_service = None
         self._i10_segmento = dados.get("i10_segmento")
-        self._fiiscom_data = dados.get("fiiscom")
+   
 
     @property
     def info(self):
@@ -52,6 +55,7 @@ class FII:
 
     @property
     def i10_service(self):
+        # Sempre retorna uma instância válida
         if self._i10_service is None:
             ticker = self.ticker.split(".")[0]
             self._i10_service = Investidor10Service(ticker)
@@ -59,11 +63,12 @@ class FII:
 
     @property
     def i10_segmento(self):
+        # Sempre prioriza o valor do cache
         return self._i10_segmento
 
-    @property
-    def fiiscom(self):
-        return self._fiiscom_data
+    # @property
+    # def fiiscom(self):
+    #     return self._fiiscom_data or {}
 
     @property
     def valor_patrimonial(self):
@@ -82,26 +87,15 @@ class FII:
 
     @property
     def vpa(self):
-        vpa_i10 = None
-        vpa_fiiscom = None
-        try:
-            vpa_i10 = self.i10_service.get_vpa()
-        except Exception:
-            pass
-        try:
-            vpa_fiiscom = self.fiiscom.get("Val. Patrimonial p/Cota")
-            if vpa_fiiscom:
-                vpa_fiiscom = float(vpa_fiiscom.replace(",", "."))
-        except Exception:
-            pass
+        print(self.fiiscom.vpa)
+        if self.fiiscom.vpa:
+            return self.fiiscom.vpa
 
-        vpas = [v for v in [vpa_i10, vpa_fiiscom] if v is not None]
-        if vpas:
-            return min(vpas)
+        
         # Cálculo antigo (Yahoo) mantido apenas para referência:
-        # if self.valor_patrimonial is not None and self.cotas_emitidas is not None:
-        #     return round(self.valor_patrimonial / self.cotas_emitidas, 2)
-        return None
+        if self.valor_patrimonial is not None and self.cotas_emitidas is not None:
+            return round(self.valor_patrimonial / self.cotas_emitidas, 2)
+        return 0
 
     @property
     def cotacao(self):
