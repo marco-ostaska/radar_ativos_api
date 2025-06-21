@@ -1,178 +1,116 @@
-import pandas as pd
-import numpy as np
-import yfinance as yf
-from app.services.investidor10 import Investidor10Service
-from app.utils.redis_cache import get_cached_data
 from datetime import datetime
+
+import numpy as np
+
 from app.db.indicadores_ativos_db import IndicadoresAtivosDB
-from app.services.banco_central import SELIC, IPCA
-from app.services.indice_refresher import IndiceRefresher
 from app.services import score_fii
+from app.services.banco_central import IPCA, SELIC
+from app.services.fii_yf import FIIYahooService
 from app.services.fiiscom import FiisComService
+from app.services.indice_refresher import IndiceRefresher
+from app.services.investidor10 import Investidor10Service
+
+
+
 
 class FII:
-    def __init__(self, ticker: str, force_update: bool = False):
+    def __init__(self, ticker, force_update=False):
         self.ticker = ticker.upper()
-        print(f"[FII] Inicializando com ticker: {self.ticker}")
+        self.ticker_base = self.ticker.split(".")[0]
+        self.yf = FIIYahooService(self.ticker, force=force_update)
+        self.fiiscom = FiisComService(self.ticker_base, force=force_update)
+        self.i10 = Investidor10Service(self.ticker_base, force=force_update)
 
-        def fetch_data():
-            fii_yf = yf.Ticker(self.ticker)
-            ticker_base = self.ticker.split(".")[0]
-            i10_service = Investidor10Service(ticker_base)
-            fiiscom = FiisComService(ticker_base)
-            
-            # return {
-            #     "info": ticker_obj.info,
-            #     "balance_sheet": ticker_obj.balance_sheet.to_dict(),
-            #     "dividends": {
-            #         str(k.date()): float(v)
-            #         for k, v in ticker_obj.dividends.items()
-            #     },
-            # }
-
-        # dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update) 
-        self._fii_yf = None
-        self._i10_service = None
-        self._fiiscom = None
-   
-    @property
-    def fii_yf(self):
-        # Sempre retorna uma instância válida
-        if self._fii_yf is None:
-            self._fii_yf = yf.Ticker(self.ticker)
-        return self._fii_yf
-
-    @property
-    def i10_service(self):
-        # Sempre retorna uma instância válida
-        if self._i10_service is None:
-            ticker = self.ticker.split(".")[0]
-            self._i10_service = Investidor10Service(ticker)
-        return self._i10_service
-    
-    @property
-    def fiiscom(self):
-        # Sempre retorna uma instância válida
-        if self._fiiscom is None:
-            ticker = self.ticker.split(".")[0]
-            self._fiiscom = FiisComService(ticker)
-        return self._fiiscom
-
-    @property
-    def i10_segmento(self):
-        # Sempre prioriza o valor do cache
-        return self.i10_service.get_segmento()
 
     @property
     def info(self):
-        return self.fii_yf.info
+        return self.yf.info
     
     @property
     def dividends(self):
-        return self.fii_yf.dividends
+        return self.yf.dividends
 
     @property
     def valor_patrimonial(self):
-        if 'Total Equity Gross Minority Interest' not in self.fii_yf.balance_sheet.index:
-            return None
-        return self.fii_yf.balance_sheet.loc['Total Equity Gross Minority Interest'].head(1).values[0]
+        if self.yf.valor_patrimonial:
+            return self.yf.valor_patrimonial
+        return self.fiiscom.valor_patrimonial
 
     @property
     def cotas_emitidas(self):
-        if 'Ordinary Shares Number' not in self.fii_yf.balance_sheet.index:
-            return None
-        valor = self.fii_yf.balance_sheet.loc['Ordinary Shares Number'].head(1).values[0]
-        if np.isnan(valor):
-            return None
-        return valor
+        if self.yf.cotas_emitidas:
+            return self.yf.cotas_emitidas
+        return self.fiiscom.cotas_emitidas
 
     @property
     def vpa(self):
         if self.fiiscom.vpa:
             return self.fiiscom.vpa
-
-        
-        # Cálculo antigo (Yahoo) mantido apenas para referência:
-        if self.valor_patrimonial is not None and self.cotas_emitidas is not None:
-            return round(self.valor_patrimonial / self.cotas_emitidas, 2)
-        return 0
+        return self.yf.vpa
 
     @property
     def cotacao(self):
-        if 'currentPrice' in self.fii_yf.info:
-            return self.fii_yf.info['currentPrice']
-        return self.fii_yf.info.get('ask', 0)
+        if self.yf.cotacao:
+            return self.yf.cotacao
+        return self.fiiscom.cotacao
 
     @property
     def pvp(self):
+        if self.i10.get_pvp():
+            return self.i10.get_pvp()
+        if self.fiiscom.pvp:
+            return self.fiiscom.pvp
         return round(self.cotacao / self.vpa, 2) if self.vpa else None
 
     @property
     def dividend_yield(self):
-        return self.fii_yf.dividends.tail(12).sum() / self.cotacao
+        if self.fiiscom.dividend_yield:
+            return self.fiiscom.dividend_yield
+        if self.i10.get_dividend_yield():
+            return self.i10.get_dividend_yield()
+        return self.yf.dividend_yield
 
     @property
     def historico_dividendos(self):
-        return {
-            '1 mes': self.fii_yf.dividends.tail(1).sum(),
-            '3 meses': self.fii_yf.dividends.tail(3).sum(),
-            '6 meses': self.fii_yf.dividends.tail(6).sum(),
-            '12 meses': self.fii_yf.dividends.tail(12).sum(),
-        }
+        if self.fiiscom.historico_dividendos:
+            return self.fiiscom.historico_dividendos
+        return self.yf.historico_dividendos
+
 
     @property
     def dividendo_estimado(self):
-        tres_meses = self.fii_yf.dividends.tail(3).sum() / 3
-        seis_meses = self.fii_yf.dividends.tail(6).sum() / 6
-        if tres_meses < seis_meses:
-            return tres_meses * 12
-        return seis_meses * 12
+        if self.fiiscom.dividendo_estimado:
+            return self.fiiscom.dividendo_estimado *12
+        return self.yf.dividendo_estimado
+
+    
+
 
     @property
     def risco_liquidez(self):
-        if "averageVolume" not in self.fii_yf.info:
-            return 10
-        volume = self.fii_yf.info.get("averageVolume", 0)
-        if volume > 50000:
-            return 1
-        elif volume > 20000:
-            return 5
-        return 10
+        if self.fiiscom.risco_liquidez:
+            return self.fiiscom.risco_liquidez
+        return self.yf.risco_liquidez
 
     @property
     def risco_tamanho(self):
-        if "marketCap" not in self.fii_yf.info:
-            return 10
-        market_cap = self.fii_yf.info.get("marketCap", 0)
-        if market_cap < 500_000_000:
-            return 5
-        return 1
+        if self.fiiscom.risco_tamanho:
+            return self.fiiscom.risco_tamanho
+        return self.yf.risco_tamanho
 
     @property
     def risco_preco_volatilidade(self):
-        if "52WeekChange" not in self.fii_yf.info:
-            return 10
-        variacao_52w = self.fii_yf.info.get("52WeekChange", 0)
-        if variacao_52w < -0.15:
-            return 10
-        if variacao_52w < -0.05:
-            return 5
-        return 1
+        if self.fiiscom.risco_preco_volatilidade:
+            return self.fiiscom.risco_preco_volatilidade
+        return self.yf.risco_preco_volatilidade
 
     @property
     def risco_rendimento(self):
-        if "dividendYield" not in self.fii_yf.info:
-            return 10
-        dy = self.fii_yf.info.get("dividendYield", 0)
-        if dy > 12:
-            return 10
-        if dy > 8:
-            return 5
-        if dy < 7:
-            return 5
-        return 1
+        if self.fiiscom.risco_rendimento:
+            return self.fiiscom.risco_rendimento
+        return self.yf.risco_rendimento
 
-    def overall_risk(self, risco_operacional: int) -> float:
+    def overall_risk(self) -> float:
         """
         Calcula o risco geral do FII com pesos definidos para cada fator.
         """
@@ -189,7 +127,7 @@ class FII:
             (self.risco_preco_volatilidade * pesos["preco_volatilidade"]) +
             (self.risco_tamanho * pesos["tamanho_fundo"]) +
             (self.risco_rendimento * pesos["rendimento"]) +
-            (risco_operacional * pesos["operacional"])
+            (self.risco_operacional(self.segmento()) * pesos["operacional"])
         )
 
         return round(min(max(overall_risk, 1), 10), 1)
@@ -198,8 +136,8 @@ class FII:
         """
         Retorna o tipo do FII (Fundo de Papel, Fundo de Tijolo, etc).
         """
-        i10 = self.i10_service
-        return i10.get_segmento()
+        return self.i10.get_segmento()
+
 
     @staticmethod
     def risco_operacional(tipo: str) -> int:
@@ -216,17 +154,17 @@ class FII:
             ticker += ".SA"
 
         ativo = self
-        tipo = ativo.i10_service.get_segmento()
+        tipo = ativo.i10.get_segmento()
         spread = db.get_spread(tipo)
         indice_base = indices_service.melhor_indice()
         spread_total = spread + indice_base
         indices = indices_service.get_indices()
 
-        dy_estimado = (ativo.dividendo_estimado * 100) / ativo.cotacao
-        teto_div = ativo.dividendo_estimado / spread_total * 100
+        dy_estimado = ativo.dividendo_estimado
+        teto_div = (ativo.dividendo_estimado/12) / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
-        risco = round(11 - ativo.overall_risk(FII.risco_operacional(tipo)), 1)
+        risco = round(11 - ativo.overall_risk(),1)
         score = score_fii.evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
             ativo.vpa > ativo.cotacao,
@@ -263,17 +201,17 @@ class FII:
             ticker += ".SA"
 
         ativo = self
-        tipo = ativo.i10_service.get_segmento()
+        tipo = ativo.i10.get_segmento()
         spread = db.get_spread(tipo)
         indice_base = indices_service.melhor_indice()
         spread_total = spread + indice_base
         indices = indices_service.get_indices()
 
-        dy_estimado = (ativo.dividendo_estimado * 100) / ativo.cotacao
-        teto_div = ativo.dividendo_estimado / spread_total * 100
+        dy_estimado = ativo.dividendo_estimado
+        teto_div = (ativo.dividendo_estimado/12) / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
-        risco = round(11 - ativo.overall_risk(FII.risco_operacional(tipo)), 1)
+        risco = round(11 - ativo.overall_risk(), 1)
         cotas_necessarias = round(12000 / ativo.dividendo_estimado, 2)
         investimento_necessario = round(cotas_necessarias * ativo.cotacao, 2)
 
@@ -284,7 +222,7 @@ class FII:
             "cotas_emitidas": int(ativo.cotas_emitidas) if ativo.cotas_emitidas else None,
             "vpa": round(ativo.vpa, 2) if ativo.vpa else None,
             "pvp": round(ativo.pvp, 2) if ativo.pvp else None,
-            "dividend_yield": round(ativo.dividend_yield * 100, 2) if ativo.dividend_yield else None,
+            "dividend_yield": round(ativo.dividend_yield, 2) if ativo.dividend_yield else None,
             "dividendo_estimado": round(ativo.dividendo_estimado, 2) if ativo.dividendo_estimado else None,
             "dy_estimado": round(dy_estimado, 2),
             "teto_div": round(teto_div, 2),
@@ -313,7 +251,24 @@ def get_investidor10(ticker: str) -> Investidor10Service:
     return Investidor10Service(ticker)
 
 def main():
-    fii = FII('VGIA11.SA', force_update=True)
+    fii = FII('FGAA11.SA')
+    # print("Dividendos:", fii.dividends)
+    # print("Valor Patrimonial:", fii.valor_patrimonial)
+    # print("Cotas Emitidas:", fii.cotas_emitidas)
+    # print("VPA:", fii.vpa)
+    # print("Cotação:", fii.cotacao)
+    # print("P/VP:", fii.pvp)
+    # print("Dividend Yield:", fii.dividend_yield)
+    # print("Histórico de Dividendos:", fii.historico_dividendos)
+    # print("Dividendo Estimado:", fii.dividendo_estimado)
+    # print("Risco de Liquidez:", fii.risco_liquidez)
+    # print("Risco de Tamanho:", fii.risco_tamanho)
+    # print("Risco de Preço/Volatilidade:", fii.risco_preco_volatilidade)
+    # print("Risco de Rendimento:", fii.risco_rendimento)
+    # print("Segmento:", fii.segmento())
+    # print("Risco Geral:", fii.overall_risk())
+
+        
     print("\n--- Teste: RADAR (cache) ---")
     print(fii.get_radar())
 
@@ -321,7 +276,7 @@ def main():
     print("\n--- Teste: RADAR (forçando refresh) ---")
     print(fii.get_radar())
 
-    fii = FII('VGIA11.SA')
+   
 
     print("\n--- Teste: DETALHADO ---")
     print(fii.get_detalhado())

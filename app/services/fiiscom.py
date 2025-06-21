@@ -198,11 +198,17 @@ class FiisComService:
     def dividendo_estimado(self):
         try:
             divs = [float(d["rendimento"].replace("R$", "").replace(",", ".").strip()) for d in self._dados["dividendos"]]
-            tres = sum(divs[:3]) / 3 if len(divs) >= 3 else 0
-            seis = sum(divs[:6]) / 6 if len(divs) >= 6 else 0
-            if tres < seis:
+            if len(divs) >= 6:
+                tres = sum(divs[:3]) / 3
+                seis = sum(divs[:6]) / 6
+                if tres < seis:
+                    return tres * 12
+                return seis * 12
+            elif len(divs) >= 3:
+                tres = sum(divs[:3]) / 3
                 return tres * 12
-            return seis * 12
+            else:
+                return None
         except Exception:
             return None
 
@@ -274,8 +280,53 @@ class FiisComService:
         except Exception:
             return 10
 
+    @property
+    def risco_tamanho(self):
+        # Usa o patrimônio extraído do HTML
+        val = self._dados["info_extra"].get("Patrimônio", "")
+        try:
+            patrimonio = float(val.replace("R$", "").replace(".", "").replace(",", "."))
+            if patrimonio > 1_000_000_000:
+                return 1
+            elif patrimonio > 500_000_000:
+                return 5
+            return 10
+        except Exception:
+            return 10
+
+    @property
+    def risco_preco_volatilidade(self):
+        val = self._dados.get("valorizacao_12_meses", "")
+        try:
+            val = str(val).replace("%", "").replace(",", ".")
+            variacao_12m = float(val)
+            if variacao_12m < -15:
+                return 10
+            if variacao_12m < -5:
+                return 5
+            return 1
+        except Exception:
+            return 10
+
+    @property
+    def risco_rendimento(self):
+        dy = self.dividend_yield
+        try:
+            if dy is None:
+                return 10
+            dy_percent = dy  # já está em percentual (ex: 17.01)
+            if dy_percent > 12:
+                return 10
+            if dy_percent > 8:
+                return 5
+            if dy_percent < 7:
+                return 5
+            return 1
+        except Exception:
+            return 10
+
 if __name__ == "__main__":
-    fii = FiisComService("vgia11", True)
+    fii = FiisComService("fgaa11", True)
     print("Nome:", fii.nome)
     print("Descrição:", fii.descricao)
     print("Cotação:", fii.cotacao)
@@ -294,3 +345,6 @@ if __name__ == "__main__":
     print("Administrador:", fii.administrador)
     print("CNPJ:", fii.cnpj)
     print("Risco de Liquidez:", fii.risco_liquidez)
+    print("Risco de Tamanho:", fii.risco_tamanho)
+    print("Risco Preço/Volatilidade:", fii.risco_preco_volatilidade)
+    print("Risco Rendimento:", fii.risco_rendimento)

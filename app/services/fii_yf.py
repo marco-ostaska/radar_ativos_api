@@ -102,8 +102,51 @@ class FIIYahooService:
         except Exception:
             return 10
 
+    @property
+    def risco_tamanho(self):
+        market_cap = self._info.get("marketCap", 0)
+        try:
+            if market_cap > 1_000_000_000:
+                return 1
+            elif market_cap > 500_000_000:
+                return 5
+            return 10
+        except Exception:
+            return 10
+
+    @property
+    def risco_preco_volatilidade(self):
+        variacao_12m = self._info.get("52WeekChange", None)
+        try:
+            if variacao_12m is None:
+                return 10
+            if variacao_12m < -0.15:
+                return 10
+            if variacao_12m < -0.05:
+                return 5
+            return 1
+        except Exception:
+            return 10
+
+    @property
+    def risco_rendimento(self):
+        dy = self.dividend_yield
+        try:
+            if dy is None:
+                return 10
+            dy_percent = dy * 100 if dy < 1 else dy  # se vier fração, converte para %
+            if dy_percent > 12:
+                return 10
+            if dy_percent > 8:
+                return 5
+            if dy_percent < 7:
+                return 5
+            return 1
+        except Exception:
+            return 10
+
 if __name__ == "__main__":
-    ticker = "VGIA11.SA"
+    ticker = "FGAA11.SA"
     fii = FIIYahooService(ticker, True)
     print(f"Ticker: {ticker}")
     print("Info:", fii.info)
@@ -116,3 +159,6 @@ if __name__ == "__main__":
     print("Valor Patrimonial:", fii.valor_patrimonial)
     print("Cotas Emitidas:", fii.cotas_emitidas)
     print("Risco de Liquidez:", fii.risco_liquidez)
+    print("Risco de Tamanho:", fii.risco_tamanho)
+    print("Risco de Preço/Volatilidade:", fii.risco_preco_volatilidade)
+    print("Risco de Rendimento:", fii.risco_rendimento)
