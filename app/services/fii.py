@@ -1,10 +1,7 @@
 from datetime import datetime
 
-import numpy as np
 
 from app.db.indicadores_ativos_db import IndicadoresAtivosDB
-from app.services import score_fii
-from app.services.banco_central import IPCA, SELIC
 from app.services.fii_yf import FIIYahooService
 from app.services.fiiscom import FiisComService
 from app.services.indice_refresher import IndiceRefresher
@@ -165,7 +162,7 @@ class FII:
         real = dy_estimado - indices["ipca_atual"]
         potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao) * 100, 2)
         risco = round(11 - ativo.overall_risk(),1)
-        score = score_fii.evaluate_fii(ativo, indice_base)
+        score = evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
             ativo.vpa > ativo.cotacao,
             teto_div > ativo.cotacao,
@@ -250,8 +247,87 @@ def get_investidor10(ticker: str) -> Investidor10Service:
     ticker = ticker.split(".")[0]
     return Investidor10Service(ticker)
 
+# --- SCORE FUNCTIONS (consolidated from score_fii.py) ---
+
+def score_dy(fii_data, indice_base: float) -> int:
+    if fii_data.dividend_yield > (indice_base + 3) / 100:
+        return 2
+    if fii_data.dividend_yield == indice_base / 100:
+        return 1
+    return 0
+
+def score_preco_medio(fii_data) -> int:
+    if 'currentPrice' not in fii_data.info or 'fiftyDayAverage' not in fii_data.info or 'fiftyTwoWeekHigh' not in fii_data.info:
+        return 0
+    score = 0
+    if fii_data.cotacao > fii_data.info['fiftyTwoWeekHigh'] * 0.90:
+        score += 1
+    if fii_data.cotacao < fii_data.info['fiftyDayAverage']:
+        score += 1
+    return score
+
+def score_market_cap(fii_data) -> int:
+    if 'marketCap' not in fii_data.info:
+        return 0
+    market_cap = fii_data.info['marketCap']
+    if market_cap > 1e9:
+        return 2
+    if market_cap > 5e8:
+        return 1
+    return 0
+
+def score_volume_medio(fii_data) -> int:
+    if 'averageVolume' not in fii_data.info:
+        return 0
+    if fii_data.info['averageVolume'] > 50000:
+        return 1
+    return 0
+
+def score_dividendos_crescentes(fii_data, indice_base: float) -> int:
+    if fii_data.dividend_yield > (indice_base + 3) / 100:
+        return 2
+    if fii_data.dividend_yield > (indice_base + 1) / 100:
+        return 1
+    return 0
+
+def score_vpa(fii_data) -> int:
+    if fii_data.vpa > fii_data.cotacao:
+        return 1
+    if fii_data.vpa == fii_data.cotacao:
+        return 0
+    return -2
+
+def bazin_score(fii_data, indice_base: float) -> int:
+    if fii_data.cotacao < fii_data.dividendo_estimado / (indice_base + 3) * 100:
+        return 1
+    return -1
+
+def calculate_max_score() -> int:
+    return (
+        2  # score_dy
+        + 2  # score_preco_medio
+        + 2  # score_market_cap
+        + 1  # score_volume_medio
+        + 2  # score_dividendos_crescentes
+        + 1  # score_vpa
+        + 1  # bazin_score
+    )
+
+def evaluate_fii(fii_data, indice_base: float) -> float:
+    score = 0
+    score += score_dy(fii_data, indice_base)
+    score += score_preco_medio(fii_data)
+    score += score_market_cap(fii_data)
+    score += score_volume_medio(fii_data)
+    score += score_dividendos_crescentes(fii_data, indice_base)
+    score += score_vpa(fii_data)
+    score += bazin_score(fii_data, indice_base)
+    max_score = calculate_max_score()
+    normalized_score = (score / max_score) * 10
+    return round(normalized_score, 1)
+
 def main():
-    fii = FII('FGAA11.SA')
+    fii = FII('MAXR11.SA')
     # print("Dividendos:", fii.dividends)
     # print("Valor Patrimonial:", fii.valor_patrimonial)
     # print("Cotas Emitidas:", fii.cotas_emitidas)
