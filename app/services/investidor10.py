@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+from app.utils.redis_cache import get_cached_data
 
 
 class Investidor10Service:
@@ -13,25 +14,42 @@ class Investidor10Service:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
     }
 
-    def __init__(self, ticker: str):
+    def __init__(self, ticker: str, force: bool = False):
         """
         Inicializa o serviço com o ticker desejado.
 
         :param ticker: Ticker do FII, ex: "HGLG11"
+        :param force: Se True, força atualização do cache
         """
         self.ticker = ticker.upper()
-        self.soup = self._baixar_html()
+        html = get_cached_data(
+            key=f"investidor10:{self.ticker}",
+            fetch_fn=lambda: self._baixar_html_raw(),
+            force=force
+        )
+        self.soup = BeautifulSoup(html, 'html.parser')
 
-    def _baixar_html(self) -> BeautifulSoup:
+    def _baixar_html_raw(self) -> str:
         """
-        Realiza o download da página do FII no Investidor10.
+        Realiza o download da página do FII no Investidor10 e retorna o HTML bruto.
 
-        :return: Objeto BeautifulSoup com o HTML carregado
+        :return: HTML da página como string
         """
         url = f"{self.BASE_URL}{self.ticker}"
         response = requests.get(url, headers=self.HEADERS)
         response.raise_for_status()
-        return BeautifulSoup(response.content, 'html.parser', from_encoding='utf-8')
+        return response.text
+
+    # def _baixar_html(self) -> BeautifulSoup:
+    #     """
+    #     Realiza o download da página do FII no Investidor10.
+    #
+    #     :return: Objeto BeautifulSoup com o HTML carregado
+    #     """
+    #     url = f"{self.BASE_URL}{self.ticker}"
+    #     response = requests.get(url, headers=self.HEADERS)
+    #     response.raise_for_status()
+    #     return BeautifulSoup(response.content, 'html.parser', from_encoding='utf-8')
 
     def get_cotacao(self) -> float | None:
         """
