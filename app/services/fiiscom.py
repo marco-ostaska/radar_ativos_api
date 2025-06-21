@@ -3,11 +3,16 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import pandas as pd
+from app.utils.redis_cache import get_cached_data
 
 class FiisComService:
-    def __init__(self, ticker: str):
+    def __init__(self, ticker: str, force: bool = False):
         self.ticker = ticker.upper()
-        self._dados = self._fetch_fiiscom_data()
+        self._dados = get_cached_data(
+            key=f"fiiscom:{self.ticker}",
+            fetch_fn=self._fetch_fiiscom_data,
+            force=force
+        )
 
     def _fetch_fiiscom_data(self):
         url = f"https://fiis.com.br/{self.ticker.lower()}/"
