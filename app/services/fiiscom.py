@@ -261,6 +261,19 @@ class FiisComService:
         except Exception:
             return val
 
+    @property
+    def risco_liquidez(self):
+        val = self._dados["indicadores_extras"].get("Liquidez média diária", "")
+        try:
+            volume = float(val.replace("M", "e6").replace(".", "").replace(",", "."))
+            if volume > 1_000_000:
+                return 1
+            elif volume > 200_000:
+                return 5
+            return 10
+        except Exception:
+            return 10
+
 if __name__ == "__main__":
     fii = FiisComService("vgia11", True)
     print("Nome:", fii.nome)
@@ -280,3 +293,4 @@ if __name__ == "__main__":
     print("Participação IFIX:", fii.participacao_ifix)
     print("Administrador:", fii.administrador)
     print("CNPJ:", fii.cnpj)
+    print("Risco de Liquidez:", fii.risco_liquidez)

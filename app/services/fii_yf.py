@@ -90,6 +90,18 @@ class FIIYahooService:
             return tres_meses * 12
         return seis_meses * 12
 
+    @property
+    def risco_liquidez(self):
+        volume = self._info.get("averageVolume", 0)
+        try:
+            if volume > 1_000_000:
+                return 1
+            elif volume > 200_000:
+                return 5
+            return 10
+        except Exception:
+            return 10
+
 if __name__ == "__main__":
     ticker = "VGIA11.SA"
     fii = FIIYahooService(ticker, True)
@@ -103,3 +115,4 @@ if __name__ == "__main__":
     print("Dividendo estimado:", fii.dividendo_estimado)
     print("Valor Patrimonial:", fii.valor_patrimonial)
     print("Cotas Emitidas:", fii.cotas_emitidas)
+    print("Risco de Liquidez:", fii.risco_liquidez)
