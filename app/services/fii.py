@@ -14,44 +14,33 @@ class FII:
     def __init__(self, ticker: str, force_update: bool = False):
         self.ticker = ticker.upper()
         print(f"[FII] Inicializando com ticker: {self.ticker}")
-        self.fiiscom = FiisComService(ticker.split(".")[0].lower())
 
         def fetch_data():
-            ticker_obj = yf.Ticker(self.ticker)
+            fii_yf = yf.Ticker(self.ticker)
             ticker_base = self.ticker.split(".")[0]
             i10_service = Investidor10Service(ticker_base)
-
+            fiiscom = FiisComService(ticker_base)
             
-            
-            return {
-                "info": ticker_obj.info,
-                "balance_sheet": ticker_obj.balance_sheet.to_dict(),
-                "dividends": {
-                    str(k.date()): float(v)
-                    for k, v in ticker_obj.dividends.items()
-                },
-                "i10_segmento": i10_service.get_segmento(),
-            }
+            # return {
+            #     "info": ticker_obj.info,
+            #     "balance_sheet": ticker_obj.balance_sheet.to_dict(),
+            #     "dividends": {
+            #         str(k.date()): float(v)
+            #         for k, v in ticker_obj.dividends.items()
+            #     },
+            # }
 
-        dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update)
-        self._info = dados["info"]
-        self._balance_sheet = pd.DataFrame(dados["balance_sheet"])
-        self._dividends = pd.Series(dados["dividends"])
+        # dados = get_cached_data(f"fii:{self.ticker}", None, fetch_data, force=force_update) 
+        self._fii_yf = None
         self._i10_service = None
-        self._i10_segmento = dados.get("i10_segmento")
+        self._fiiscom = None
    
-
     @property
-    def info(self):
-        return self._info
-
-    @property
-    def balance_sheet(self):
-        return self._balance_sheet
-
-    @property
-    def dividends(self):
-        return self._dividends
+    def fii_yf(self):
+        # Sempre retorna uma instância válida
+        if self._fii_yf is None:
+            self._fii_yf = yf.Ticker(self.ticker)
+        return self._fii_yf
 
     @property
     def i10_service(self):
@@ -60,19 +49,25 @@ class FII:
             ticker = self.ticker.split(".")[0]
             self._i10_service = Investidor10Service(ticker)
         return self._i10_service
+    
+    @property
+    def fiiscom(self):
+        # Sempre retorna uma instância válida
+        if self._fiiscom is None:
+            ticker = self.ticker.split(".")[0]
+            self._fiiscom = FiisComService(ticker)
+        return self._fiiscom
 
     @property
     def i10_segmento(self):
         # Sempre prioriza o valor do cache
-        return self._i10_segmento
+        return self.i10_service.get_segmento()
 
-    # @property
-    # def fiiscom(self):
-    #     return self._fiiscom_data or {}
+
 
     @property
     def valor_patrimonial(self):
-        if 'Total Equity Gross Minority Interest' not in self.balance_sheet.index:
+        if 'Total Equity Gross Minority Interest' not in self.fii.yf.balance_sheet.index:
             return None
         return self.balance_sheet.loc['Total Equity Gross Minority Interest'].head(1).values[0]
 
@@ -87,7 +82,6 @@ class FII:
 
     @property
     def vpa(self):
-        print(self.fiiscom.vpa)
         if self.fiiscom.vpa:
             return self.fiiscom.vpa
 
@@ -99,9 +93,9 @@ class FII:
 
     @property
     def cotacao(self):
-        if 'currentPrice' in self.info:
-            return self.info['currentPrice']
-        return self.info.get('ask', 0)
+        if 'currentPrice' in self.fii_yf.info:
+            return self.fii_yf.info['currentPrice']
+        return self.fii_yf.info.get('ask', 0)
 
     @property
     def pvp(self):
@@ -109,30 +103,30 @@ class FII:
 
     @property
     def dividend_yield(self):
-        return self.dividends.tail(12).sum() / self.cotacao
+        return self.fii_yf.dividends.tail(12).sum() / self.cotacao
 
     @property
     def historico_dividendos(self):
         return {
-            '1 mes': self.dividends.tail(1).sum(),
-            '3 meses': self.dividends.tail(3).sum(),
-            '6 meses': self.dividends.tail(6).sum(),
-            '12 meses': self.dividends.tail(12).sum(),
+            '1 mes': self.fii_yf.dividends.tail(1).sum(),
+            '3 meses': self.fii_yf.dividends.tail(3).sum(),
+            '6 meses': self.fii_yf.dividends.tail(6).sum(),
+            '12 meses': self.fii_yf.dividends.tail(12).sum(),
         }
 
     @property
     def dividendo_estimado(self):
-        tres_meses = self.dividends.tail(3).sum() / 3
-        seis_meses = self.dividends.tail(6).sum() / 6
+        tres_meses = self.fii_yf.dividends.tail(3).sum() / 3
+        seis_meses = self.fii_yf.dividends.tail(6).sum() / 6
         if tres_meses < seis_meses:
             return tres_meses * 12
         return seis_meses * 12
 
     @property
     def risco_liquidez(self):
-        if "averageVolume" not in self.info:
+        if "averageVolume" not in self.fii_yf.info:
             return 10
-        volume = self.info.get("averageVolume", 0)
+        volume = self.fii_yf.info.get("averageVolume", 0)
         if volume > 50000:
             return 1
         elif volume > 20000:
@@ -141,18 +135,18 @@ class FII:
 
     @property
     def risco_tamanho(self):
-        if "marketCap" not in self.info:
+        if "marketCap" not in self.fii_yf.info:
             return 10
-        market_cap = self.info.get("marketCap", 0)
+        market_cap = self.fii_yf.info.get("marketCap", 0)
         if market_cap < 500_000_000:
             return 5
         return 1
 
     @property
     def risco_preco_volatilidade(self):
-        if "52WeekChange" not in self.info:
+        if "52WeekChange" not in self.fii_yf.info:
             return 10
-        variacao_52w = self.info.get("52WeekChange", 0)
+        variacao_52w = self.fii_yf.info.get("52WeekChange", 0)
         if variacao_52w < -0.15:
             return 10
         if variacao_52w < -0.05:
@@ -161,9 +155,9 @@ class FII:
 
     @property
     def risco_rendimento(self):
-        if "dividendYield" not in self.info:
+        if "dividendYield" not in self.fii_yf.info:
             return 10
-        dy = self.info.get("dividendYield", 0)
+        dy = self.fii_yf.info.get("dividendYield", 0)
         if dy > 12:
             return 10
         if dy > 8:
