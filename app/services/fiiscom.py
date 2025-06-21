@@ -31,13 +31,22 @@ class FiisComService:
             descricao = desc_div.find("p").get_text(strip=True)
 
         indicadores = []
+        dividend_yield_html = None
         indicators = soup.find("div", class_="indicators")
         if indicators:
             for box in indicators.find_all("div", class_="indicators__box"):
-                valor = box.find("b").get_text(strip=True) if box.find("b") else ""
                 ps = box.find_all("p")
-                label = ps[1].get_text(strip=True) if len(ps) > 1 else ""
+                valor = ""
+                label = ""
+                if len(ps) == 2:
+                    valor = ps[0].find("b").get_text(strip=True) if ps[0].find("b") else ""
+                    label = ps[1].get_text(strip=True)
+                elif len(ps) == 1:
+                    valor = ps[0].find("b").get_text(strip=True) if ps[0].find("b") else ""
+                    label = ""
                 indicadores.append((label, valor))
+                if "Dividend Yield" in label and valor:
+                    dividend_yield_html = float(valor.replace(",", ".").replace("%", "").strip())
 
         cotacao = ""
         min_52 = ""
@@ -107,6 +116,7 @@ class FiisComService:
             "info_extra": info,
             "jsonld": jsonld_data,
             "indicadores_extras": indicadores_extras,
+            "dividend_yield_html": dividend_yield_html,
         }
 
     @property
@@ -168,13 +178,8 @@ class FiisComService:
 
     @property
     def dividend_yield(self):
-        try:
-            divs = [float(d["rendimento"].replace("R$", "").replace(",", ".").strip()) for d in self._dados["dividendos"]]
-            if not divs or not self.cotacao:
-                return None
-            return round(sum(divs[:12]) / self.cotacao, 4)
-        except Exception:
-            return None
+        """Retorna o Dividend Yield exatamente como aparece no HTML (ex: 17.01 para 17,01%)."""
+        return self._dados.get("dividend_yield_html")
 
     @property
     def historico_dividendos(self):
@@ -257,7 +262,7 @@ class FiisComService:
             return val
 
 if __name__ == "__main__":
-    fii = FiisComService("vgia11")
+    fii = FiisComService("vgia11", True)
     print("Nome:", fii.nome)
     print("Descrição:", fii.descricao)
     print("Cotação:", fii.cotacao)
