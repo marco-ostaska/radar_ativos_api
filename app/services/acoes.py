@@ -16,17 +16,18 @@ def safe_dict(df: pd.DataFrame) -> dict:
 
 
 class Acao:
-    def __init__(self, ticker: str):
+    def __init__(self, ticker: str, force: bool = False):
         self.ticker = ticker.upper()
 
         dados = get_cached_data(
             f"acao:{self.ticker}",
-            600,
+            None,
             lambda: {
                 "info": yf.Ticker(self.ticker).info,
                 "income_stmt": safe_dict(yf.Ticker(self.ticker).income_stmt),
                 "adj_close": safe_dict(yf.download(self.ticker, period="5y", progress=False, auto_adjust=False))
-            }
+            },
+            force=force
         )
 
         self.info = dados["info"]

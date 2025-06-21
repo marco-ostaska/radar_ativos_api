@@ -63,13 +63,14 @@ refresher = IndiceRefresher()
 
 
 @router.get("/radar", summary="Retorna informações resumidas da ação para radar")
-def obter_dados_acao(ticker: str = Query(..., description="Ticker da ação, ex: ITSA4")):
+def obter_dados_acao(ticker: str = Query(..., description="Ticker da ação, ex: ITSA4"),
+force: bool = Query(False, description="Força atualização dos dados ignorando o cache")):
     try:
         ticker = ticker.upper()
         if not ticker.endswith(".SA"):
             ticker += ".SA"
 
-        acao = Acao(ticker)
+        acao = Acao(ticker, force=force)
         indices = refresher.get_indices()
         indice_base = refresher.melhor_indice()
 
