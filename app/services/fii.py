@@ -63,19 +63,25 @@ class FII:
         # Sempre prioriza o valor do cache
         return self.i10_service.get_segmento()
 
-
+    @property
+    def info(self):
+        return self.fii_yf.info
+    
+    @property
+    def dividends(self):
+        return self.fii_yf.dividends
 
     @property
     def valor_patrimonial(self):
-        if 'Total Equity Gross Minority Interest' not in self.fii.yf.balance_sheet.index:
+        if 'Total Equity Gross Minority Interest' not in self.fii_yf.balance_sheet.index:
             return None
-        return self.balance_sheet.loc['Total Equity Gross Minority Interest'].head(1).values[0]
+        return self.fii_yf.balance_sheet.loc['Total Equity Gross Minority Interest'].head(1).values[0]
 
     @property
     def cotas_emitidas(self):
-        if 'Ordinary Shares Number' not in self.balance_sheet.index:
+        if 'Ordinary Shares Number' not in self.fii_yf.balance_sheet.index:
             return None
-        valor = self.balance_sheet.loc['Ordinary Shares Number'].head(1).values[0]
+        valor = self.fii_yf.balance_sheet.loc['Ordinary Shares Number'].head(1).values[0]
         if np.isnan(valor):
             return None
         return valor
