@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Path
 from app.services.acoes import Acao
 from app.services.fii import FII
-from app.services.fii_detalhe import FiiDetalhe
+from app.services.score_fii import evaluate_fii
 import sqlite3
 import os
 
@@ -9,8 +9,6 @@ router = APIRouter(
     prefix="/carteira",
     tags=["Carteira"]
 )
-
-fii_detalhe = FiiDetalhe()
 
 @router.get("/acoes")
 async def obter_carteira_acoes(
@@ -179,20 +177,17 @@ async def obter_carteira_fii(
             # Calcula rendimento mensal estimado
             rendimento_mensal = (fii.dividendo_estimado * quantidade)
             
-            # Get radar data for recommendation
-            radar_data = fii_detalhe.get_radar(ticker)
-            
-            # Implement recommendation logic
-            if radar_data['comprar'] and radar_data['potencial'] > 10:
+            # Score e recomendação baseada em evaluate_fii
+            score = evaluate_fii(fii, 7)
+            if score >= 7.5:
                 recomendacao = "COMPRAR ou APORTAR"
-            elif radar_data['potencial'] < -15 and radar_data['spread_usado'] < 2:
+            elif score <= 4:
                 recomendacao = "VENDER ou realizar parcial"
-            elif radar_data['spread_usado'] < 3 or radar_data['potencial'] < 0:
-                recomendacao = "MANTER com cautela"
             else:
                 recomendacao = "MANTER"
-            
+
             resultado.append({
+                "score": score,
                 "ticker": ticker,
                 "quantidade": quantidade,
                 "preco_medio": round(preco_medio, 2),
@@ -201,7 +196,7 @@ async def obter_carteira_fii(
                 "valor_investido": round(valor_investido, 2),
                 "saldo": round(saldo, 2),
                 "rendimento_mensal_estimado": round(rendimento_mensal, 2),
-                "dy": round(fii.dividend_yield * 100, 2),
+                "dy": round(fii.dividend_yield, 2),
                 "pvp": round(fii.pvp, 2),
                 "recomendacao": recomendacao
             })
