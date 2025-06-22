@@ -160,7 +160,7 @@ class FII:
         dy_estimado = (ativo.dividendo_estimado /12) / ativo.cotacao * 100
         teto_div = (ativo.dividendo_estimado /12) / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
-        potencial = round(((teto_div - ativo.cotacao) / ativo.cotacao), 2)
+        potencial = round((((teto_div - ativo.cotacao) / ativo.cotacao)*100), 2)
         risco = round(11 - ativo.overall_risk(),1)
         score = evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
