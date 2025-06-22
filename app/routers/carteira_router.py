@@ -174,28 +174,41 @@ async def obter_carteira_fii(
             valor_investido = preco_medio * quantidade
             saldo = preco_atual * quantidade
             
+            # calcula dividendo estimado por cota
+
+            dy_estimado = (fii.dividendo_estimado /12) / fii.cotacao * 100
+            dividendo_real = ((dy_estimado/12) *fii.cotacao) / 100
+            
             # Calcula rendimento mensal estimado
-            rendimento_mensal = (fii.dividendo_estimado * quantidade)
+            rendimento_mensal = (dividendo_real * quantidade)
             
             # Score e recomendação baseada em evaluate_fii
             score = evaluate_fii(fii, 7)
-            if score >= 7.5:
-                recomendacao = "COMPRAR ou APORTAR"
-            elif score <= 4:
-                recomendacao = "VENDER ou realizar parcial"
+            if fii.pvp >= 1:
+                if score <= 4:
+                    recomendacao = "VENDER ou realizar parcial"
+                else:
+                    recomendacao = "MANTER com cautela"
             else:
-                recomendacao = "MANTER"
+                if score >= 7.5:
+                    recomendacao = "COMPRAR ou APORTAR"
+                elif score <= 4:
+                    recomendacao = "VENDER ou realizar parcial"
+                else:
+                    recomendacao = "MANTER"
 
             resultado.append({
-                "score": score,
                 "ticker": ticker,
+                "score": score,
                 "quantidade": quantidade,
                 "preco_medio": round(preco_medio, 2),
                 "preco_atual": round(preco_atual, 2),
                 "variacao": round(variacao, 2),
                 "valor_investido": round(valor_investido, 2),
                 "saldo": round(saldo, 2),
+                "dividendo_mensal": round(dividendo_real, 2),
                 "rendimento_mensal_estimado": round(rendimento_mensal, 2),
+                "dividendo_estimado": round(dy_estimado, 2),
                 "dy": round(fii.dividend_yield, 2),
                 "pvp": round(fii.pvp, 2),
                 "recomendacao": recomendacao

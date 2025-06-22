@@ -78,7 +78,8 @@ class FII:
     def dividendo_estimado(self):
         if self.fiiscom.dividendo_estimado:
             return self.fiiscom.dividendo_estimado *12
-        return self.yf.dividendo_estimado
+        # return self.yf.dividendo_estimado
+        return None
 
     
 
