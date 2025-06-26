@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Body
+from pydantic import BaseModel, conint
 from app.services.acoes import Acao
 from app.services.fii import FII
 from app.services.score_fii import evaluate_fii
@@ -9,6 +10,8 @@ router = APIRouter(
     prefix="/carteira",
     tags=["Carteira"]
 )
+
+# Removido NotaAcaoRequest pois não é mais necessário
 
 @router.get("/acoes")
 async def obter_carteira_acoes(
@@ -108,6 +111,34 @@ async def obter_carteira_acoes(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao obter carteira: {str(e)}")
         
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@router.post("/acoes/nota")
+async def setar_nota_acao(
+    carteira_id: int = Query(..., description="ID da carteira"),
+    ticker: str = Query(..., description="Ticker da ação"),
+    nota: int = Query(..., ge=0, le=100, description="Nota de 0 a 100")
+):
+    """
+    Define ou atualiza a nota de um ativo (ação) para uma carteira.
+    """
+    try:
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO notas_acoes (carteira_id, ticker, nota)
+            VALUES (?, ?, ?)
+            ON CONFLICT(carteira_id, ticker) DO UPDATE SET nota=excluded.nota
+            """,
+            (carteira_id, ticker, nota)
+        )
+        conn.commit()
+        return {"mensagem": f"Nota {nota} registrada para {ticker} na carteira {carteira_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao registrar nota: {str(e)}")
     finally:
         if 'conn' in locals():
             conn.close()
