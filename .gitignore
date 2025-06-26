@@ -39,3 +39,4 @@ Thumbs.db
 .env
 sqlite/radar_ativos.db
 sqlite/radar_ativos.db
+.aider*
