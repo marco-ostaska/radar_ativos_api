@@ -138,6 +138,7 @@ async def obter_carteira_acoes(
             
             porcentagem_carteira = (saldo / saldo_total * 100) if saldo_total > 0 else 0
             porcentagem_ideal = (nota / soma_notas * 100) if (nota is not None and soma_notas > 0) else None
+            valor_aportar = ((porcentagem_ideal / 100) * saldo_total - saldo) if porcentagem_ideal is not None else None
             resultado.append({
                 "ticker": ticker,
                 "quantidade": quantidade,
@@ -152,7 +153,9 @@ async def obter_carteira_acoes(
                 "recomendacao": recomendacao,
                 "nota": nota,
                 "porcentagem_carteira": round(porcentagem_carteira, 2),
-                "porcentagem_ideal": round(porcentagem_ideal, 2) if porcentagem_ideal is not None else None
+                "porcentagem_ideal": round(porcentagem_ideal, 2) if porcentagem_ideal is not None else None,
+                "valor_aportar": round(valor_aportar, 2) if valor_aportar is not None else None,
+                "aportar": bool(valor_aportar is not None and valor_aportar > 0)
             })
         
         return resultado
@@ -323,6 +326,7 @@ async def obter_carteira_fii(
 
             porcentagem_carteira = (saldo / saldo_total * 100) if saldo_total > 0 else 0
             porcentagem_ideal = (nota / soma_notas * 100) if (nota is not None and soma_notas > 0) else None
+            valor_aportar = ((porcentagem_ideal / 100) * saldo_total - saldo) if porcentagem_ideal is not None else None
             resultado.append({
                 "ticker": ticker,
                 "score": score,
@@ -340,7 +344,9 @@ async def obter_carteira_fii(
                 "recomendacao": recomendacao,
                 "nota": nota,
                 "porcentagem_carteira": round(porcentagem_carteira, 2),
-                "porcentagem_ideal": round(porcentagem_ideal, 2) if porcentagem_ideal is not None else None
+                "porcentagem_ideal": round(porcentagem_ideal, 2) if porcentagem_ideal is not None else None,
+                "valor_aportar": round(valor_aportar, 2) if valor_aportar is not None else None,
+                "aportar": bool(valor_aportar is not None and valor_aportar > 0)
             })
         
         return resultado
