@@ -42,7 +42,31 @@ async def obter_carteira_acoes(
             return []
         
         resultado = []
+        saldos = []
+        # Primeiro loop para calcular todos os saldos
         for ticker, quantidade in acoes:
+            cursor.execute("""
+                SELECT tipo_transacao, preco, quantidade
+                FROM transacoes_acoes
+                WHERE ticker = ? AND carteira_id = ? AND ativo = 1
+                ORDER BY data_transacao
+            """, (ticker, carteira_id))
+            transacoes = cursor.fetchall()
+            preco_medio = 0
+            quantidade_total = 0
+            for tipo, preco, qtd in transacoes:
+                if tipo in ['COMPRA', 'DESDOBRAMENTO', 'AGRUPAMENTO', 'BONIFICACAO']:
+                    preco_medio = ((preco_medio * quantidade_total) + (preco * qtd)) / (quantidade_total + qtd)
+                    quantidade_total += qtd
+                elif tipo == 'VENDA':
+                    quantidade_total -= qtd
+            acao = Acao(ticker)
+            preco_atual = acao.cotacao
+            saldo = preco_atual * quantidade
+            saldos.append(saldo)
+        saldo_total = sum(saldos)
+        # Segundo loop para montar resultado com porcentagem
+        for idx, (ticker, quantidade) in enumerate(acoes):
             # Busca todas as transações da ação
             cursor.execute("""
                 SELECT tipo_transacao, preco, quantidade
@@ -100,6 +124,7 @@ async def obter_carteira_acoes(
             else:
                 recomendacao = "MANTER"
             
+            porcentagem_carteira = (saldo / saldo_total * 100) if saldo_total > 0 else 0
             resultado.append({
                 "ticker": ticker,
                 "quantidade": quantidade,
@@ -112,7 +137,8 @@ async def obter_carteira_acoes(
                 "excesso_pl": round(excesso_pl, 2),
                 "excesso_dy": round(excesso_dy, 2),
                 "recomendacao": recomendacao,
-                "nota": nota
+                "nota": nota,
+                "porcentagem_carteira": round(porcentagem_carteira, 2)
             })
         
         return resultado
@@ -182,7 +208,31 @@ async def obter_carteira_fii(
             return []
         
         resultado = []
+        saldos = []
+        # Primeiro loop para calcular todos os saldos
         for ticker, quantidade in fiis:
+            cursor.execute("""
+                SELECT tipo_transacao, preco, quantidade
+                FROM transacoes_fii
+                WHERE ticker = ? AND carteira_id = ? AND ativo = 1
+                ORDER BY data_transacao
+            """, (ticker, carteira_id))
+            transacoes = cursor.fetchall()
+            preco_medio = 0
+            quantidade_total = 0
+            for tipo, preco, qtd in transacoes:
+                if tipo in ['COMPRA', 'DESDOBRAMENTO', 'AGRUPAMENTO', 'BONIFICACAO']:
+                    preco_medio = ((preco_medio * quantidade_total) + (preco * qtd)) / (quantidade_total + qtd)
+                    quantidade_total += qtd
+                elif tipo == 'VENDA':
+                    quantidade_total -= qtd
+            fii = FII(ticker)
+            preco_atual = fii.cotacao
+            saldo = preco_atual * quantidade
+            saldos.append(saldo)
+        saldo_total = sum(saldos)
+        # Segundo loop para montar resultado com porcentagem
+        for idx, (ticker, quantidade) in enumerate(fiis):
             # Busca todas as transações do FII
             cursor.execute("""
                 SELECT tipo_transacao, preco, quantidade
@@ -245,6 +295,7 @@ async def obter_carteira_fii(
                 else:
                     recomendacao = "MANTER"
 
+            porcentagem_carteira = (saldo / saldo_total * 100) if saldo_total > 0 else 0
             resultado.append({
                 "ticker": ticker,
                 "score": score,
@@ -260,7 +311,8 @@ async def obter_carteira_fii(
                 "dy": round(fii.dividend_yield, 2),
                 "pvp": round(fii.pvp, 2),
                 "recomendacao": recomendacao,
-                "nota": nota
+                "nota": nota,
+                "porcentagem_carteira": round(porcentagem_carteira, 2)
             })
         
         return resultado
