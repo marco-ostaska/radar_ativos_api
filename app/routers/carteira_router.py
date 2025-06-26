@@ -222,6 +222,14 @@ async def obter_carteira_fii(
             # Calcula rendimento mensal estimado
             rendimento_mensal = (dividendo_real * quantidade)
             
+            # Busca nota na tabela notas_fiis
+            cursor.execute(
+                "SELECT nota FROM notas_fiis WHERE carteira_id = ? AND ticker = ?",
+                (carteira_id, ticker)
+            )
+            row = cursor.fetchone()
+            nota = row[0] if row else None
+
             # Score e recomendação baseada em evaluate_fii
             score = evaluate_fii(fii, 7)
             if fii.pvp >= 1:
@@ -251,7 +259,8 @@ async def obter_carteira_fii(
                 "dividendo_estimado": round(dy_estimado, 2),
                 "dy": round(fii.dividend_yield, 2),
                 "pvp": round(fii.pvp, 2),
-                "recomendacao": recomendacao
+                "recomendacao": recomendacao,
+                "nota": nota
             })
         
         return resultado
@@ -259,6 +268,34 @@ async def obter_carteira_fii(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao obter carteira: {str(e)}")
         
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@router.post("/fii/nota")
+async def setar_nota_fii(
+    carteira_id: int = Query(..., description="ID da carteira"),
+    ticker: str = Query(..., description="Ticker do FII"),
+    nota: int = Query(..., ge=0, le=100, description="Nota de 0 a 100")
+):
+    """
+    Define ou atualiza a nota de um FII para uma carteira.
+    """
+    try:
+        conn = sqlite3.connect('sqlite/radar_ativos.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO notas_fiis (carteira_id, ticker, nota)
+            VALUES (?, ?, ?)
+            ON CONFLICT(carteira_id, ticker) DO UPDATE SET nota=excluded.nota
+            """,
+            (carteira_id, ticker, nota)
+        )
+        conn.commit()
+        return {"mensagem": f"Nota {nota} registrada para {ticker} na carteira {carteira_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao registrar nota: {str(e)}")
     finally:
         if 'conn' in locals():
             conn.close()
