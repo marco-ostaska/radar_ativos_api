@@ -65,7 +65,19 @@ async def obter_carteira_acoes(
             saldo = preco_atual * quantidade
             saldos.append(saldo)
         saldo_total = sum(saldos)
-        # Segundo loop para montar resultado com porcentagem
+        # Segundo loop para montar resultado com porcentagem e porcentagem_ideal
+        notas_lista = []
+        for ticker, quantidade in acoes:
+            cursor.execute(
+                "SELECT nota FROM notas_acoes WHERE carteira_id = ? AND ticker = ?",
+                (carteira_id, ticker)
+            )
+            row = cursor.fetchone()
+            nota = row[0] if row else None
+            if nota is not None:
+                notas_lista.append(nota)
+        soma_notas = sum(notas_lista) if notas_lista else 0
+
         for idx, (ticker, quantidade) in enumerate(acoes):
             # Busca todas as transações da ação
             cursor.execute("""
@@ -125,6 +137,7 @@ async def obter_carteira_acoes(
                 recomendacao = "MANTER"
             
             porcentagem_carteira = (saldo / saldo_total * 100) if saldo_total > 0 else 0
+            porcentagem_ideal = (nota / soma_notas * 100) if (nota is not None and soma_notas > 0) else None
             resultado.append({
                 "ticker": ticker,
                 "quantidade": quantidade,
@@ -138,7 +151,8 @@ async def obter_carteira_acoes(
                 "excesso_dy": round(excesso_dy, 2),
                 "recomendacao": recomendacao,
                 "nota": nota,
-                "porcentagem_carteira": round(porcentagem_carteira, 2)
+                "porcentagem_carteira": round(porcentagem_carteira, 2),
+                "porcentagem_ideal": round(porcentagem_ideal, 2) if porcentagem_ideal is not None else None
             })
         
         return resultado
@@ -231,7 +245,19 @@ async def obter_carteira_fii(
             saldo = preco_atual * quantidade
             saldos.append(saldo)
         saldo_total = sum(saldos)
-        # Segundo loop para montar resultado com porcentagem
+        # Segundo loop para montar resultado com porcentagem e porcentagem_ideal
+        notas_lista = []
+        for ticker, quantidade in fiis:
+            cursor.execute(
+                "SELECT nota FROM notas_fiis WHERE carteira_id = ? AND ticker = ?",
+                (carteira_id, ticker)
+            )
+            row = cursor.fetchone()
+            nota = row[0] if row else None
+            if nota is not None:
+                notas_lista.append(nota)
+        soma_notas = sum(notas_lista) if notas_lista else 0
+
         for idx, (ticker, quantidade) in enumerate(fiis):
             # Busca todas as transações do FII
             cursor.execute("""
@@ -296,6 +322,7 @@ async def obter_carteira_fii(
                     recomendacao = "MANTER"
 
             porcentagem_carteira = (saldo / saldo_total * 100) if saldo_total > 0 else 0
+            porcentagem_ideal = (nota / soma_notas * 100) if (nota is not None and soma_notas > 0) else None
             resultado.append({
                 "ticker": ticker,
                 "score": score,
@@ -312,7 +339,8 @@ async def obter_carteira_fii(
                 "pvp": round(fii.pvp, 2),
                 "recomendacao": recomendacao,
                 "nota": nota,
-                "porcentagem_carteira": round(porcentagem_carteira, 2)
+                "porcentagem_carteira": round(porcentagem_carteira, 2),
+                "porcentagem_ideal": round(porcentagem_ideal, 2) if porcentagem_ideal is not None else None
             })
         
         return resultado
