@@ -82,6 +82,14 @@ async def obter_carteira_acoes(
             excesso_pl = (preco_atual / teto_por_lucro - 1) * 100 if teto_por_lucro else 0
             excesso_dy = (preco_atual / teto_por_dy - 1) * 100 if teto_por_dy else 0
             
+            # Busca nota na tabela notas_acoes
+            cursor.execute(
+                "SELECT nota FROM notas_acoes WHERE carteira_id = ? AND ticker = ?",
+                (carteira_id, ticker)
+            )
+            row = cursor.fetchone()
+            nota = row[0] if row else None
+
             # Define recomendação
             if excesso_pl > 20 and excesso_dy > 20 and lucro_latente > 30:
                 recomendacao = "VENDER ou realizar parcial"
@@ -103,7 +111,8 @@ async def obter_carteira_acoes(
                 "lucro_latente": round(lucro_latente, 2),
                 "excesso_pl": round(excesso_pl, 2),
                 "excesso_dy": round(excesso_dy, 2),
-                "recomendacao": recomendacao
+                "recomendacao": recomendacao,
+                "nota": nota
             })
         
         return resultado
