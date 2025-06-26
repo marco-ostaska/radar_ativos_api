@@ -43,13 +43,13 @@ class Acao:
 
     def calcular_teto_cotacao_lucro(self) -> float | None:
         income = self.income_stmt.loc['Net Income'].dropna().tail(5)
-        print("income:", income)
+        # print("income:", income)
         datas = list(pd.to_datetime(income.index).year)
-        print("datas:", datas)
+        # print("datas:", datas)
         lucros = list(income.values)
-        print("lucros:", lucros)
+        # print("lucros:", lucros)
         cotacoes = [self.media_ponderada_fechamento(ano) for ano in datas]
-        print("cotacoes:", cotacoes)
+        # print("cotacoes:", cotacoes)
         datas, lucros, cotacoes = datas[::-1], lucros[::-1], cotacoes[::-1]
 
         try:

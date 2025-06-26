@@ -12,7 +12,7 @@ app = FastAPI(
 # Libera requisições do front-end React
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Ou ["*"] se quiser liberar tudo no dev
+    allow_origins=["*"],  # Permite todas as origens
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
