@@ -1,217 +1,88 @@
 # Radar Ativos API
 
-API para gerenciamento de carteiras de investimentos, incluindo ações e FIIs.
+API para análise de ações e FIIs, focada em investimentos brasileiros. Permite consultar indicadores, gerenciar carteiras, registrar transações e obter recomendações quantitativas.
+
+Um front-end para utilizar esta API está disponível em: [https://github.com/marco-ostaska/radar-ui](https://github.com/marco-ostaska/radar-ui)
 
 ## Funcionalidades
 
-- Gerenciamento de carteiras
-- Registro de transações de ações e FIIs
-- Cálculo de métricas de investimento
-- Recomendações de trading baseadas em indicadores
+- Consulta de dados resumidos e detalhados de ações e FIIs
+- Gerenciamento de carteiras (ações e FIIs)
+- Registro e atualização de transações
+- Consulta e administração de indicadores de mercado
+- Recomendações quantitativas baseadas em critérios objetivos
+- Integração com fontes externas (Banco Central, Investidor10, Yahoo Finance)
 
-## Estrutura do Banco de Dados
+## Endpoints Principais
 
-### Tabelas Principais
+- `/acoes/radar`: Retorna informações resumidas de uma ação (ticker, cotação, DY, potencial, score, recomendação de compra)
+- `/carteira`: Gerencia carteiras de ações e FIIs (adicionar, remover, listar)
+- `/transacoes`: Adiciona, lista, atualiza e remove transações de ativos
+- `/indicadores`: Consulta e administra indicadores de mercado
+- `/indices`: Consulta índices econômicos (IPCA, Selic, etc.)
 
-#### 1. Tabela `tipos`
-Armazena os tipos de ativos e suas características.
-- `tipo` (TEXT, PK): Tipo do ativo
-- `spread` (INTEGER): Spread associado ao tipo
-- `risco_operacional` (INTEGER): Nível de risco operacional
+> A documentação interativa (Swagger) estará disponível em `http://localhost:8000/docs` após subir a API.
 
-#### 2. Tabela `ativos`
-Cadastro de todos os ativos disponíveis.
-- `ticker` (TEXT, PK): Código do ativo
-- `tipo` (TEXT, FK): Referência à tabela `tipos`
+## Banco de Dados
 
-#### 3. Tabela `transacoes_acoes`
-Registro de todas as transações de ações.
-- `id` (INTEGER, PK): Identificador único
-- `ticker` (TEXT, FK): Código da ação
-- `data_transacao` (TEXT): Data da transação
-- `tipo_transacao` (TEXT): Tipo (COMPRA, VENDA)
-- `preco` (REAL): Preço unitário
-- `quantidade` (INTEGER): Quantidade de ações
-- `data_atualizacao` (TEXT): Data da última atualização
+> **Importante:** O banco de dados precisa ser criado antes de subir a aplicação.
 
-#### 4. Tabela `transacoes_fiis`
-Registro de todas as transações de FIIs.
-- `id` (INTEGER, PK): Identificador único
-- `ticker` (TEXT, FK): Código do FII
-- `data_transacao` (TEXT): Data da transação
-- `tipo_transacao` (TEXT): Tipo (COMPRA, VENDA)
-- `preco` (REAL): Preço unitário
-- `quantidade` (INTEGER): Quantidade de cotas
-- `data_atualizacao` (TEXT): Data da última atualização
+### Como criar o banco de dados
 
-#### 5. Tabela `carteira_acoes`
-Resumo da carteira de ações.
-- `ticker` (TEXT, PK): Código da ação
-- `quantidade_total` (INTEGER): Quantidade total em carteira
-- `preco_medio` (REAL): Preço médio de compra
-- `total_investido` (REAL): Valor total investido
-- `data_atualizacao` (TEXT): Data da última atualização
+Execute o comando abaixo para criar toda a estrutura do banco:
 
-#### 6. Tabela `carteira_fiis`
-Resumo da carteira de FIIs.
-- `ticker` (TEXT, PK): Código do FII
-- `quantidade_total` (INTEGER): Quantidade total em carteira
-- `preco_medio` (REAL): Preço médio de compra
-- `total_investido` (REAL): Valor total investido
-- `data_atualizacao` (TEXT): Data da última atualização
-
-#### 7. Tabela `indices_banco_central`
-Armazena índices econômicos.
-- `indice` (TEXT, PK): Nome do índice
-- `valor` (REAL): Valor atual do índice
-- `data_atualizacao` (TEXT): Data da última atualização
-
-### Índices
-- `idx_transacoes_acoes_ticker`: Índice para busca por ticker em transações de ações
-- `idx_transacoes_acoes_data`: Índice para busca por data em transações de ações
-- `idx_transacoes_fiis_ticker`: Índice para busca por ticker em transações de FIIs
-- `idx_transacoes_fiis_data`: Índice para busca por data em transações de FIIs
-
-### Triggers
-- `update_transacoes_acoes_timestamp`: Atualiza data_atualizacao após modificação em transacoes_acoes
-- `update_transacoes_fiis_timestamp`: Atualiza data_atualizacao após modificação em transacoes_fiis
-
-## Requisitos
-
-- Python 3.8+
-- SQLite3
-
-## Instalação
-
-1. Clone o repositório:
-```bash
-git clone https://github.com/marco-ostaska/radar_ativos_api.git
-cd radar_ativos_api
+```sh
+sqlite3 radar_ativos.db < sqlite/create_radar_db.sql
 ```
 
-2. Instale as dependências:
-```bash
-pip install -r requirements.txt
-```
+O projeto utiliza um banco SQLite local (`radar_ativos.db`) com a seguinte arquitetura:
 
-3. Inicialize o banco de dados:
-```bash
-python sqlite/init_transacoes.py
-```
+- **tipos**: Tipos de ativos (ex: ação, FII).
+- **ativos**: Lista de ativos (tickers) e seus tipos.
+- **indices_banco_central**: Índices econômicos (ex: selic, ipca, ipca_atual).
+- **transacoes_acoes**: Registro de transações de ações (compra, venda, quantidade, preço, data, ativo).
+- **transacoes_fii** / **transacoes_fiis**: Registro de transações de FIIs.
+- **carteira_acoes**: Carteira consolidada de ações por ticker.
+- **carteira_fiis**: Carteira consolidada de FIIs por ticker.
+- **notas_acoes**: Notas atribuídas a ações por carteira (carteira_id, ticker, nota de 0 a 100).
+- **notas_fiis**: Notas atribuídas a FIIs por carteira (carteira_id, ticker, nota de 0 a 100).
 
-## Executando a API
+As tabelas de transações armazenam o histórico de operações do usuário, enquanto as tabelas de carteira consolidam os saldos atuais. A tabela de índices permite integração e atualização automática de indicadores econômicos.
 
-```bash
-uvicorn app.main:app --reload
-```
+As relações entre as tabelas são feitas principalmente via o campo `ticker` e tipos de ativos.
 
-A API estará disponível em `http://localhost:8000`
+## Instalação e Execução
 
-## Documentação da API
+### Via Docker
 
-### Transações de Ações
-
-#### Listar Transações
-```
-GET /transacoes/acoes/listar?carteira_id=1
-```
-
-#### Adicionar Transação
-```
-POST /transacoes/acoes/adicionar
-Parâmetros:
-- carteira_id: ID da carteira
-- ticker: Código da ação (ex: PETR4)
-- quantidade: Quantidade de ações
-- preco: Preço unitário
-- tipo: COMPRA ou VENDA
-- data: Data da transação (dd/mm/yyyy)
-```
-
-#### Atualizar Transação
-```
-PUT /transacoes/acoes/atualizar/{transacao_id}
-Parâmetros:
-- carteira_id: ID da carteira
-- ticker: Código da ação
-- quantidade: Quantidade de ações
-- preco: Preço unitário
-- tipo: COMPRA ou VENDA
-- data: Data da transação (dd/mm/yyyy)
-```
-
-#### Deletar Transação
-```
-DELETE /transacoes/acoes/deletar/{transacao_id}?carteira_id=1
-```
-
-### Transações de FIIs
-
-#### Listar Transações
-```
-GET /transacoes/fii/listar?carteira_id=1
-```
-
-#### Adicionar Transação
-```
-POST /transacoes/fii/adicionar
-Parâmetros:
-- carteira_id: ID da carteira
-- ticker: Código do FII (ex: HGLG11)
-- quantidade: Quantidade de cotas
-- preco: Preço unitário
-- tipo: COMPRA ou VENDA
-- data: Data da transação (dd/mm/yyyy)
-```
-
-#### Atualizar Transação
-```
-PUT /transacoes/fii/atualizar/{transacao_id}
-Parâmetros:
-- carteira_id: ID da carteira
-- ticker: Código do FII
-- quantidade: Quantidade de cotas
-- preco: Preço unitário
-- tipo: COMPRA ou VENDA
-- data: Data da transação (dd/mm/yyyy)
-```
-
-#### Deletar Transação
-```
-DELETE /transacoes/fii/deletar/{transacao_id}?carteira_id=1
-```
-
-### Carteira
-
-#### Listar Carteira
-- **GET** `/carteira/acoes/{carteira_id}`
-  - Lista todas as ações de uma carteira específica
-  - Retorna: Lista de ações com quantidade, preço médio, preço atual, variação, valor investido, saldo, rendimento mensal estimado, DY e P/VP
-
-- **GET** `/carteira/fii/{carteira_id}`
-  - Lista todos os FIIs de uma carteira específica
-  - Retorna: Lista de FIIs com quantidade, preço médio, preço atual, variação, valor investido, saldo, rendimento mensal estimado, DY e P/VP
-
-#### Deletar Carteira
-- **DELETE** `/carteira/acoes/delete?carteira_id={id}`
-  - Deleta todas as transações de uma carteira de ações
-  - Retorna: Mensagem com quantidade de transações deletadas
-  - Erro 404: Se não existirem transações para a carteira
-
-- **DELETE** `/carteira/fii/delete?carteira_id={id}`
-  - Deleta todas as transações de uma carteira de FII
-  - Retorna: Mensagem com quantidade de transações deletadas
-  - Erro 404: Se não existirem transações para a carteira
-
-## Docker
-
-Para executar a API usando Docker:
-
-```bash
+```sh
 docker build -t radar-ativos-api .
 docker run -p 8000:8000 radar-ativos-api
 ```
 
-## Licença
+### Localmente
 
-Este projeto está sob a licença MIT. 
+```sh
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+A API estará disponível em `http://localhost:8000`.
+
+## Redis
+
+Esta API faz uso do Redis para cache de dados e otimização de performance, reduzindo o tempo de resposta em consultas frequentes e evitando sobrecarga em integrações externas.
+
+Para rodar o Redis localmente via Docker:
+
+```sh
+docker run -d --name redis-local -p 6379:6379 redis:7-alpine redis-server --appendonly yes
+```
+
+> O Redis deve estar em execução antes de iniciar a API.
+
+---
+
+## Disclaimer
+
+Esta API foi desenvolvida exclusivamente para fins de estudo e testes. Ela faz uso de dados de terceiros, que podem mudar a qualquer momento e comprometer seu funcionamento. Não há qualquer garantia sobre a precisão, disponibilidade ou continuidade dos dados fornecidos. O autor não se responsabiliza por eventuais perdas, danos ou decisões tomadas com base nas informações retornadas por esta API. **Não utilize esta API para análises financeiras reais ou decisões de investimento.**
