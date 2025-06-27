@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import acoes_router, fii_router, indicadores_admin_router, indices_router
+from app.routers import acoes_router, fii_router, indicadores_admin_router, indices_router, transacoes_router, carteira_router
 
 app = FastAPI(
     title="Radar Ativos API",
@@ -9,17 +9,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 🔓 Libera requisições do front-end React
+# Libera requisições do front-end React
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Ou ["*"] se quiser liberar tudo no dev
+    allow_origins=["*"],  # Permite todas as origens
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 🚀 Rotas
+# Rotas
 app.include_router(acoes_router.router)
 app.include_router(fii_router.router)
-app.include_router(indices_router.router)
 app.include_router(indicadores_admin_router.router)
+app.include_router(indices_router.router)
+app.include_router(transacoes_router.router)
+app.include_router(carteira_router.router)

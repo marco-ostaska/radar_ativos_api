@@ -1,48 +1,65 @@
 from math import sqrt
-
 import pandas as pd
 import yfinance as yf
+from app.utils.redis_cache import get_cached_data
 from scipy.stats import trim_mean
+
+def safe_dict(df: pd.DataFrame) -> dict:
+    """
+    Garante que colunas e índices sejam serializáveis como JSON.
+    Converte Timestamp e colunas em string.
+    """
+    df = df.copy()
+    df.columns = df.columns.map(str)
+    df.index = df.index.map(str)
+    return df.to_dict(orient="index")
 
 
 class Acao:
-    """
-    Representa uma ação consultada via Yahoo Finance (yfinance).
-    Oferece diversos indicadores financeiros para análise fundamentalista.
-    """
-
-    def __init__(self, ticker: str):
-        """
-        Inicializa o objeto Acao com um ticker específico.
-
-        :param ticker: Código da ação (ex: "VALE3.SA")
-        """
+    def __init__(self, ticker: str, force: bool = False):
         self.ticker = ticker.upper()
-        self.acao = yf.Ticker(self.ticker)
-        self.adj_close = yf.download(self.ticker, period="5y", progress=False, auto_adjust=False)
 
-    def media_ponderada_fechamento(self, ano: int) -> float:
-        """
-        Calcula a média aparada dos fechamentos do ano fornecido.
+        dados = get_cached_data(
+            f"acao:{self.ticker}",
+            None,
+            lambda: {
+                "info": yf.Ticker(self.ticker).info,
+                "income_stmt": safe_dict(yf.Ticker(self.ticker).income_stmt),
+                "adj_close": safe_dict(yf.download(self.ticker, period="5y", progress=False, auto_adjust=False))
+            },
+            force=force
+        )
 
-        :param ano: Ano de referência
-        :return: Média aparada
-        """
-        return trim_mean(self.adj_close.loc[f"{ano}-"].tail(30).values, proportiontocut=0.1)
+        self.info = dados["info"]
+        self.income_stmt = pd.DataFrame.from_dict(dados["income_stmt"], orient="index")
+        self.adj_close = pd.DataFrame.from_dict(dados["adj_close"], orient="index")
+
+    def media_ponderada_fechamento(self, ano: int) -> float | None:
+        #return trim_mean(self.adj_close.loc[f"{ano}-"].tail(30).values, proportiontocut=0.1)
+        mask = pd.to_datetime(self.adj_close.index).year == ano
+      
+        return trim_mean(self.adj_close.loc[mask].tail(30).values, proportiontocut=0.1)
+
 
     def calcular_teto_cotacao_lucro(self) -> float | None:
-        """
-        Estima o teto da cotação com base nos lucros históricos.
+        income = self.income_stmt.loc['Net Income'].dropna().tail(5)
+        # print("income:", income)
+        datas = list(pd.to_datetime(income.index).year)
+        # print("datas:", datas)
+        lucros = list(income.values)
+        # print("lucros:", lucros)
+        cotacoes = [self.media_ponderada_fechamento(ano) for ano in datas]
+        # print("cotacoes:", cotacoes)
+        datas, lucros, cotacoes = datas[::-1], lucros[::-1], cotacoes[::-1]
 
-        :return: Teto calculado ou None
-        """
         try:
-            income = self.acao.income_stmt.loc['Net Income'].dropna().tail(5)
-            datas = list(income.index.year)
+            income = self.income_stmt.loc['Net Income'].dropna().tail(5)
+            datas = list(pd.to_datetime(income.index).year)
             lucros = list(income.values)
             cotacoes = [float(self.media_ponderada_fechamento(ano)[0]) for ano in datas]
-
             datas, lucros, cotacoes = datas[::-1], lucros[::-1], cotacoes[::-1]
+
+  
 
             df = pd.DataFrame({
                 "Ano": datas,
@@ -57,8 +74,8 @@ class Acao:
             max_lucro = df["Lucro Liquido"].max()
 
             normalizado = round(min_cot + (ultimo_lucro - min_lucro) * (max_cot - min_cot) / (max_lucro - min_lucro), 2)
+            previous_close = self.info.get("previousClose") or self.info.get("regularMarketPreviousClose") or 0
 
-            previous_close = self.acao.info.get("previousClose", 0)
 
             if ultimo_lucro < 0:
                 ajuste = (
@@ -75,108 +92,69 @@ class Acao:
     @property
     def cotacao(self) -> float:
         """Cotação atual."""
-        if 'currentPrice' in self.acao.info:
-            return self.acao.info['currentPrice']
-        if 'previousClose' in self.acao.info:
-            return self.acao.info['previousClose']
-        return self.adj_close.iloc[-1]
+        if 'currentPrice' in self.info:
+            return self.info['currentPrice']
+        if 'previousClose' in self.info:
+            return self.info['previousClose']
+        if 'regularMarketPrice' in self.info:
+            return self.info['regularMarketPrice']
+        try:
+            return self.adj_close.iloc[-1]['Close']
+        except Exception:
+            print("Erro:", self.info)
+            return None
 
     @property
     def earning_yield(self) -> float:
-        """Earning yield (inverso do P/L)."""
-        if 'trailingPE' in self.acao.info:
-            return (1 / self.acao.info['trailingPE']) * 100
+        if 'trailingPE' in self.info:
+            return (1 / self.info['trailingPE']) * 100
         return 0
 
     @property
-    def pl(self) -> float | None:
-        """P/L (Preço/Lucro)."""
-        return self.acao.info.get('trailingPE')
-
+    def pl(self) -> float | None: return self.info.get('trailingPE')
     @property
-    def margem_liquida(self) -> float | None:
-        """Margem líquida."""
-        return self.acao.info.get('profitMargins')
-
+    def margem_liquida(self) -> float | None: return self.info.get('profitMargins')
     @property
-    def liquidez_corrente(self) -> float | None:
-        """Liquidez corrente (quick ratio)."""
-        return self.acao.info.get('quickRatio')
-
+    def liquidez_corrente(self) -> float | None: return self.info.get('quickRatio')
     @property
     def div_ebitda(self) -> float | None:
-        """Dívida líquida sobre EBITDA."""
-        if 'totalDebt' not in self.acao.info or 'ebitda' not in self.acao.info:
-            return None
-        return self.acao.info['totalDebt'] / self.acao.info['ebitda']
-
+        if 'totalDebt' not in self.info or 'ebitda' not in self.info: return None
+        return self.info['totalDebt'] / self.info['ebitda']
     @property
-    def dy(self) -> float:
-        """Dividend Yield atual (decimal, ex: 0.05 para 5%)."""
-        return self.acao.info.get('dividendYield', 0) / 100
-
+    def dy(self) -> float: return self.info.get('dividendYield', 0) / 100
     @property
-    def roe(self) -> float | None:
-        """Return on Equity (ROE)."""
-        return self.acao.info.get('returnOnEquity')
-
+    def roe(self) -> float | None: return self.info.get('returnOnEquity')
     @property
-    def recomendacao(self) -> str | None:
-        """Recomendação de analistas (buy, hold, sell)."""
-        return self.acao.info.get('recommendationKey')
-
+    def recomendacao(self) -> str | None: return self.info.get('recommendationKey')
     @property
-    def lucro(self) -> float | None:
-        """Lucro (profit margins)."""
-        return self.acao.info.get('profitMargins')
-
+    def lucro(self) -> float | None: return self.info.get('profitMargins')
     @property
-    def receita(self) -> float | None:
-        """Crescimento de receita."""
-        return self.acao.info.get('revenueGrowth')
-
+    def receita(self) -> float | None: return self.info.get('revenueGrowth')
     @property
     def dy_estimado(self) -> float:
-        """Dividend yield projetado."""
-        if 'dividendRate' in self.acao.info and 'currentPrice' in self.acao.info:
-            return self.acao.info['dividendRate'] / self.acao.info['currentPrice']
+        if 'dividendRate' in self.info and 'currentPrice' in self.info:
+            return self.info['dividendRate'] / self.info['currentPrice']
         return 0
-
     @property
-    def risco_geral(self) -> int:
-        """Risco geral."""
-        return self.acao.info.get('overallRisk', 10)
-
+    def risco_geral(self) -> int: return self.info.get('overallRisk', 10)
     @property
     def free_float(self) -> float:
-        """Percentual de ações em circulação (free float)."""
-        if 'floatShares' in self.acao.info and 'impliedSharesOutstanding' in self.acao.info:
-            return (self.acao.info['floatShares'] / self.acao.info['impliedSharesOutstanding']) * 100
+        if 'floatShares' in self.info and 'impliedSharesOutstanding' in self.info:
+            return (self.info['floatShares'] / self.info['impliedSharesOutstanding']) * 100
         return 0
-
     @property
-    def lucro_liquido(self) -> float | None:
-        """Lucro líquido (Net Income To Common)."""
-        return self.acao.info.get('netIncomeToCommon')
-
+    def lucro_liquido(self) -> float | None: return self.info.get('netIncomeToCommon')
     @property
-    def valor_mercado(self) -> float | None:
-        """Valor de mercado."""
-        return self.acao.info.get('marketCap')
-
+    def valor_mercado(self) -> float | None: return self.info.get('marketCap')
     @property
-    def vpa(self) -> float | None:
-        """Valor patrimonial por ação (Book Value)."""
-        return self.acao.info.get('bookValue')
-
+    def vpa(self) -> float | None: return self.info.get('bookValue')
     @property
-    def lpa(self) -> float | None:
-        """Lucro por ação (Trailing EPS)."""
-        return self.acao.info.get('trailingEps')
-    
+    def lpa(self) -> float | None: return self.info.get('trailingEps')
+
 
 def main():
     ativo = Acao("VALE3.SA")
+    
     print("Ticker:", ativo.ticker)
     print("Cotação:", ativo.cotacao)
     print("Teto por lucro:", ativo.calcular_teto_cotacao_lucro())

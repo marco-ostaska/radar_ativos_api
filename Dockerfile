@@ -1,12 +1,20 @@
-FROM python:3.12-slim
+FROM python:3.12-alpine
+
+# Configura o timezone para Brasil (America/Sao_Paulo)
+ENV TZ=America/Sao_Paulo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Cria usuário e grupo 'radar'
+RUN addgroup -S radar && adduser -S radar -G radar
 
 WORKDIR /radar
 
 
-RUN apt-get update && apt-get install -y \
-    gcc vim \
-    && apt-get auto-remove -y \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    && rm -rf /var/cache/apk/*
 
 
 COPY requirements.txt /radar
@@ -16,10 +24,11 @@ RUN pip install --no-cache-dir  --upgrade pip \
 
 COPY app /radar/app
 
-COPY sqlite /radar/sqlite 
+# Ajusta permissões para o usuário 'radar'
+RUN chown -R radar:radar /radar
+
+USER radar
 
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "5"]
-
-

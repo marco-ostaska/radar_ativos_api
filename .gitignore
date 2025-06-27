@@ -18,6 +18,7 @@ build/
 venv/
 env/
 .env/
+radar/
 
 # IDE specific files
 .vscode/
@@ -36,3 +37,6 @@ Thumbs.db
 
 .devcontainer
 .env
+sqlite/radar_ativos.db
+sqlite/radar_ativos.db
+.aider*
