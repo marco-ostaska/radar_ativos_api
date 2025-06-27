@@ -198,19 +198,51 @@ def deletar_transacao_acao(
 ):
     """
     Deleta uma transação de ação específica.
+    Se for desdobramento/agrupamento, reativa apenas as transações inativadas por esse evento.
     """
     conn = sqlite3.connect('sqlite/radar_ativos.db')
     try:
         cursor = conn.cursor()
+        # Buscar a transação alvo
+        cursor.execute(
+            "SELECT id, ticker, data_transacao, tipo_transacao FROM transacoes_acoes WHERE id = ? AND carteira_id = ?",
+            (transacao_id, carteira_id)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Transação não encontrada ou não pertence à carteira especificada")
+        _, ticker, data_transacao, tipo_transacao = row
+        tipo_transacao = tipo_transacao.lower()
+        if tipo_transacao in ('desdobramento', 'agrupamento'):
+            # Buscar todas as transações anteriores (inclusive) ordenadas da mais recente para a mais antiga
+            cursor.execute(
+                """
+                SELECT id, tipo_transacao FROM transacoes_acoes
+                WHERE ticker = ? AND carteira_id = ? AND data_transacao <= ?
+                ORDER BY data_transacao DESC, id DESC
+                """,
+                (ticker, carteira_id, data_transacao)
+            )
+            transacoes = cursor.fetchall()
+            ids_para_reativar = []
+            for t_id, t_tipo in transacoes:
+                if t_id == transacao_id:
+                    continue  # não reativa o próprio evento
+                if t_tipo.lower() in ('desdobramento', 'agrupamento'):
+                    break  # encontrou outro evento, para aqui
+                ids_para_reativar.append(t_id)
+            # Reativa apenas se houver transações elegíveis
+            if ids_para_reativar:
+                cursor.execute(
+                    f"UPDATE transacoes_acoes SET ativo = 1 WHERE id IN ({','.join(['?']*len(ids_para_reativar))})",
+                    ids_para_reativar
+                )
+        # Após reativar (se necessário), deleta a transação de desdobramento/agrupamento
         cursor.execute(
             "DELETE FROM transacoes_acoes WHERE id = ? AND carteira_id = ?",
             (transacao_id, carteira_id)
         )
         conn.commit()
-        
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Transação não encontrada ou não pertence à carteira especificada")
-            
         return {"mensagem": "Transação deletada com sucesso"}
     except HTTPException:
         raise
@@ -226,19 +258,51 @@ def deletar_transacao_fii(
 ):
     """
     Deleta uma transação de FII específica.
+    Se for desdobramento/agrupamento, reativa apenas as transações inativadas por esse evento.
     """
     conn = sqlite3.connect('sqlite/radar_ativos.db')
     try:
         cursor = conn.cursor()
+        # Buscar a transação alvo
+        cursor.execute(
+            "SELECT id, ticker, data_transacao, tipo_transacao FROM transacoes_fii WHERE id = ? AND carteira_id = ?",
+            (transacao_id, carteira_id)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Transação não encontrada ou não pertence à carteira especificada")
+        _, ticker, data_transacao, tipo_transacao = row
+        tipo_transacao = tipo_transacao.lower()
+        if tipo_transacao in ('desdobramento', 'agrupamento'):
+            # Buscar todas as transações anteriores (inclusive) ordenadas da mais recente para a mais antiga
+            cursor.execute(
+                """
+                SELECT id, tipo_transacao FROM transacoes_fii
+                WHERE ticker = ? AND carteira_id = ? AND data_transacao <= ?
+                ORDER BY data_transacao DESC, id DESC
+                """,
+                (ticker, carteira_id, data_transacao)
+            )
+            transacoes = cursor.fetchall()
+            ids_para_reativar = []
+            for t_id, t_tipo in transacoes:
+                if t_id == transacao_id:
+                    continue  # não reativa o próprio evento
+                if t_tipo.lower() in ('desdobramento', 'agrupamento'):
+                    break  # encontrou outro evento, para aqui
+                ids_para_reativar.append(t_id)
+            # Reativa apenas se houver transações elegíveis
+            if ids_para_reativar:
+                cursor.execute(
+                    f"UPDATE transacoes_fii SET ativo = 1 WHERE id IN ({','.join(['?']*len(ids_para_reativar))})",
+                    ids_para_reativar
+                )
+        # Após reativar (se necessário), deleta a transação de desdobramento/agrupamento
         cursor.execute(
             "DELETE FROM transacoes_fii WHERE id = ? AND carteira_id = ?",
             (transacao_id, carteira_id)
         )
         conn.commit()
-        
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Transação não encontrada ou não pertence à carteira especificada")
-            
         return {"mensagem": "Transação deletada com sucesso"}
     except HTTPException:
         raise
@@ -415,16 +479,20 @@ async def aplicar_desdobramento(
         
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
-        
+
         # Soma todas as quantidades ativas
         quantidade_total = sum(transacao[1] for transacao in transacoes)
-        
+
+        # Calcula o preço médio ponderado das transações ativas
+        soma_valor = sum(transacao[1] * transacao[2] for transacao in transacoes)
+        preco_medio = soma_valor / quantidade_total if quantidade_total > 0 else 0
+
         # Calcula a nova quantidade (multiplicando para desdobramento)
         nova_quantidade = int(quantidade_total * fator_ajuste)
-        
-        # Calcula o novo preço
-        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
-        
+
+        # Calcula o novo preço (preço médio dividido pelo fator de ajuste)
+        novo_preco = preco_medio / fator_ajuste if fator_ajuste > 0 else 0
+
         # Marca todas as transações anteriores como inativas
         cursor.execute("""
             UPDATE transacoes_acoes
@@ -505,16 +573,20 @@ async def aplicar_agrupamento(
         
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
-        
+
         # Soma todas as quantidades ativas
         quantidade_total = sum(transacao[1] for transacao in transacoes)
-        
+
+        # Calcula o preço médio ponderado das transações ativas
+        soma_valor = sum(transacao[1] * transacao[2] for transacao in transacoes)
+        preco_medio = soma_valor / quantidade_total if quantidade_total > 0 else 0
+
         # Calcula a nova quantidade (dividindo para agrupamento)
         nova_quantidade = int(quantidade_total * fator_ajuste)
-        
-        # Calcula o novo preço
-        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
-        
+
+        # Calcula o novo preço (preço médio multiplicado pelo inverso do fator de ajuste)
+        novo_preco = preco_medio * (proporcao_antes / proporcao_depois) if proporcao_depois > 0 else 0
+
         # Marca todas as transações anteriores como inativas
         cursor.execute("""
             UPDATE transacoes_acoes
@@ -595,16 +667,20 @@ async def aplicar_desdobramento_fii(
         
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
-        
+
         # Soma todas as quantidades ativas
         quantidade_total = sum(transacao[1] for transacao in transacoes)
-        
+
+        # Calcula o preço médio ponderado das transações ativas
+        soma_valor = sum(transacao[1] * transacao[2] for transacao in transacoes)
+        preco_medio = soma_valor / quantidade_total if quantidade_total > 0 else 0
+
         # Calcula a nova quantidade (multiplicando para desdobramento)
         nova_quantidade = int(quantidade_total * fator_ajuste)
-        
-        # Calcula o novo preço
-        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
-        
+
+        # Calcula o novo preço (preço médio dividido pelo fator de ajuste)
+        novo_preco = preco_medio / fator_ajuste if fator_ajuste > 0 else 0
+
         # Marca todas as transações anteriores como inativas
         cursor.execute("""
             UPDATE transacoes_fii
@@ -685,16 +761,20 @@ async def aplicar_agrupamento_fii(
         
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
-        
+
         # Soma todas as quantidades ativas
         quantidade_total = sum(transacao[1] for transacao in transacoes)
-        
+
+        # Calcula o preço médio ponderado das transações ativas
+        soma_valor = sum(transacao[1] * transacao[2] for transacao in transacoes)
+        preco_medio = soma_valor / quantidade_total if quantidade_total > 0 else 0
+
         # Calcula a nova quantidade (dividindo para agrupamento)
         nova_quantidade = int(quantidade_total * fator_ajuste)
-        
-        # Calcula o novo preço
-        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
-        
+
+        # Calcula o novo preço (preço médio multiplicado pelo inverso do fator de ajuste)
+        novo_preco = preco_medio * (proporcao_antes / proporcao_depois) if proporcao_depois > 0 else 0
+
         # Marca todas as transações anteriores como inativas
         cursor.execute("""
             UPDATE transacoes_fii
@@ -720,4 +800,4 @@ async def aplicar_agrupamento_fii(
         
     finally:
         if 'conn' in locals():
-            conn.close() 
+            conn.close()
