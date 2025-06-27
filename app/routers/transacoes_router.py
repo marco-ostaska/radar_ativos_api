@@ -479,16 +479,20 @@ async def aplicar_desdobramento(
         
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
-        
+
         # Soma todas as quantidades ativas
         quantidade_total = sum(transacao[1] for transacao in transacoes)
-        
+
+        # Calcula o preço médio ponderado das transações ativas
+        soma_valor = sum(transacao[1] * transacao[2] for transacao in transacoes)
+        preco_medio = soma_valor / quantidade_total if quantidade_total > 0 else 0
+
         # Calcula a nova quantidade (multiplicando para desdobramento)
         nova_quantidade = int(quantidade_total * fator_ajuste)
-        
-        # Calcula o novo preço
-        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
-        
+
+        # Calcula o novo preço (preço médio dividido pelo fator de ajuste)
+        novo_preco = preco_medio / fator_ajuste if fator_ajuste > 0 else 0
+
         # Marca todas as transações anteriores como inativas
         cursor.execute("""
             UPDATE transacoes_acoes
@@ -659,16 +663,20 @@ async def aplicar_desdobramento_fii(
         
         # Calcula o fator de ajuste
         fator_ajuste = proporcao_depois / proporcao_antes
-        
+
         # Soma todas as quantidades ativas
         quantidade_total = sum(transacao[1] for transacao in transacoes)
-        
+
+        # Calcula o preço médio ponderado das transações ativas
+        soma_valor = sum(transacao[1] * transacao[2] for transacao in transacoes)
+        preco_medio = soma_valor / quantidade_total if quantidade_total > 0 else 0
+
         # Calcula a nova quantidade (multiplicando para desdobramento)
         nova_quantidade = int(quantidade_total * fator_ajuste)
-        
-        # Calcula o novo preço
-        novo_preco = transacoes[0][2] / fator_ajuste  # Usa o preço da primeira transação
-        
+
+        # Calcula o novo preço (preço médio dividido pelo fator de ajuste)
+        novo_preco = preco_medio / fator_ajuste if fator_ajuste > 0 else 0
+
         # Marca todas as transações anteriores como inativas
         cursor.execute("""
             UPDATE transacoes_fii
