@@ -77,7 +77,11 @@ class FII:
     @property
     def dividendo_estimado(self):
         if self.fiiscom.dividendo_estimado:
+            print("Usando dividendo estimado do FiisCom")
             return self.fiiscom.dividendo_estimado *12
+        if self.yf.dividendo_estimado:
+            print("Usando dividendo estimado do Yahoo Finance")
+            return self.yf.dividendo_estimado
         # return self.yf.dividendo_estimado
         return None
 
@@ -328,7 +332,7 @@ def evaluate_fii(fii_data, indice_base: float) -> float:
     return round(normalized_score, 1)
 
 def main():
-    fii = FII('MAXR11.SA')
+    fii = FII('XPCA11.SA')
     # print("Dividendos:", fii.dividends)
     # print("Valor Patrimonial:", fii.valor_patrimonial)
     # print("Cotas Emitidas:", fii.cotas_emitidas)

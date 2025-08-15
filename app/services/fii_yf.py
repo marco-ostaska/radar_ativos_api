@@ -5,7 +5,10 @@ from app.utils.redis_cache import get_cached_data
 
 class FIIYahooService:
     def __init__(self, ticker: str, force: bool = False):
-        self.ticker = ticker.upper()
+        ticker = ticker.upper()
+        if not ticker.endswith('.SA'):
+            ticker = ticker + '.SA'
+        self.ticker = ticker
         def fetch_data():
             fii_yf = yf.Ticker(self.ticker)
             return {
