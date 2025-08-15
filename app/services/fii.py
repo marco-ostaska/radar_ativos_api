@@ -17,6 +17,19 @@ class FII:
         self.yf = FIIYahooService(self.ticker, force=force_update)
         self.fiiscom = FiisComService(self.ticker_base, force=force_update)
         self.i10 = Investidor10Service(self.ticker_base, force=force_update)
+        # Caches internos para evitar múltiplas chamadas às APIs
+        self._dividendo_estimado = None
+        self._valor_patrimonial = None
+        self._cotas_emitidas = None
+        self._vpa = None
+        self._cotacao = None
+        self._pvp = None
+        self._dividend_yield = None
+        self._historico_dividendos = None
+        self._risco_liquidez = None
+        self._risco_tamanho = None
+        self._risco_preco_volatilidade = None
+        self._risco_rendimento = None
 
 
     @property
@@ -29,88 +42,158 @@ class FII:
 
     @property
     def valor_patrimonial(self):
+        if self._valor_patrimonial is not None:
+            return self._valor_patrimonial
+        valor = None
         if self.yf.valor_patrimonial:
-            return self.yf.valor_patrimonial
-        return self.fiiscom.valor_patrimonial
+            valor = self.yf.valor_patrimonial
+        else:
+            valor = self.fiiscom.valor_patrimonial
+        self._valor_patrimonial = valor
+        return valor
 
     @property
     def cotas_emitidas(self):
+        if self._cotas_emitidas is not None:
+            return self._cotas_emitidas
+        valor = None
         if self.yf.cotas_emitidas:
-            return self.yf.cotas_emitidas
-        return self.fiiscom.cotas_emitidas
+            valor = self.yf.cotas_emitidas
+        else:
+            valor = self.fiiscom.cotas_emitidas
+        self._cotas_emitidas = valor
+        return valor
 
     @property
     def vpa(self):
+        if self._vpa is not None:
+            return self._vpa
+        valor = None
         if self.fiiscom.vpa:
-            return self.fiiscom.vpa
-        return self.yf.vpa
+            valor = self.fiiscom.vpa
+        else:
+            valor = self.yf.vpa
+        self._vpa = valor
+        return valor
 
     @property
     def cotacao(self):
+        if self._cotacao is not None:
+            return self._cotacao
+        valor = None
         if self.yf.cotacao:
-            return self.yf.cotacao
-        return self.fiiscom.cotacao
+            valor = self.yf.cotacao
+        else:
+            valor = self.fiiscom.cotacao
+        self._cotacao = valor
+        return valor
 
     @property
     def pvp(self):
+        if self._pvp is not None:
+            return self._pvp
+        valor = None
         if self.i10.get_pvp():
-            return self.i10.get_pvp()
-        if self.fiiscom.pvp:
-            return self.fiiscom.pvp
-        return round(self.cotacao / self.vpa, 2) if self.vpa else None
+            valor = self.i10.get_pvp()
+        elif self.fiiscom.pvp:
+            valor = self.fiiscom.pvp
+        else:
+            valor = round(self.cotacao / self.vpa, 2) if self.vpa else None
+        self._pvp = valor
+        return valor
 
     @property
     def dividend_yield(self):
+        if self._dividend_yield is not None:
+            return self._dividend_yield
+        valor = None
         if self.fiiscom.dividend_yield:
-            return self.fiiscom.dividend_yield
-        if self.i10.get_dividend_yield():
-            return self.i10.get_dividend_yield()
-        return self.yf.dividend_yield
+            valor = self.fiiscom.dividend_yield
+        elif self.i10.get_dividend_yield():
+            valor = self.i10.get_dividend_yield()
+        else:
+            valor = self.yf.dividend_yield
+        self._dividend_yield = valor
+        return valor
 
     @property
     def historico_dividendos(self):
+        if self._historico_dividendos is not None:
+            return self._historico_dividendos
+        valor = None
         if self.fiiscom.historico_dividendos:
-            return self.fiiscom.historico_dividendos
-        return self.yf.historico_dividendos
+            valor = self.fiiscom.historico_dividendos
+        else:
+            valor = self.yf.historico_dividendos
+        self._historico_dividendos = valor
+        return valor
 
 
     @property
     def dividendo_estimado(self):
+        # Cache interno para evitar múltiplas chamadas às APIs
+        if self._dividendo_estimado is not None:
+            return self._dividendo_estimado
+        valor = None
         if self.fiiscom.dividendo_estimado:
-            print("Usando dividendo estimado do FiisCom")
-            return self.fiiscom.dividendo_estimado *12
-        if self.yf.dividendo_estimado:
-            print("Usando dividendo estimado do Yahoo Finance")
-            return self.yf.dividendo_estimado
-        # return self.yf.dividendo_estimado
-        return None
+            # print("Usando dividendo estimado do FiisCom")
+            valor = self.fiiscom.dividendo_estimado * 12
+        elif self.yf.dividendo_estimado:
+            # print("Usando dividendo estimado do Yahoo Finance")
+            valor = self.yf.dividendo_estimado
+        self._dividendo_estimado = valor
+        return valor
 
     
 
 
     @property
     def risco_liquidez(self):
+        if self._risco_liquidez is not None:
+            return self._risco_liquidez
+        valor = None
         if self.fiiscom.risco_liquidez:
-            return self.fiiscom.risco_liquidez
-        return self.yf.risco_liquidez
+            valor = self.fiiscom.risco_liquidez
+        else:
+            valor = self.yf.risco_liquidez
+        self._risco_liquidez = valor
+        return valor
 
     @property
     def risco_tamanho(self):
+        if self._risco_tamanho is not None:
+            return self._risco_tamanho
+        valor = None
         if self.fiiscom.risco_tamanho:
-            return self.fiiscom.risco_tamanho
-        return self.yf.risco_tamanho
+            valor = self.fiiscom.risco_tamanho
+        else:
+            valor = self.yf.risco_tamanho
+        self._risco_tamanho = valor
+        return valor
 
     @property
     def risco_preco_volatilidade(self):
+        if self._risco_preco_volatilidade is not None:
+            return self._risco_preco_volatilidade
+        valor = None
         if self.fiiscom.risco_preco_volatilidade:
-            return self.fiiscom.risco_preco_volatilidade
-        return self.yf.risco_preco_volatilidade
+            valor = self.fiiscom.risco_preco_volatilidade
+        else:
+            valor = self.yf.risco_preco_volatilidade
+        self._risco_preco_volatilidade = valor
+        return valor
 
     @property
     def risco_rendimento(self):
+        if self._risco_rendimento is not None:
+            return self._risco_rendimento
+        valor = None
         if self.fiiscom.risco_rendimento:
-            return self.fiiscom.risco_rendimento
-        return self.yf.risco_rendimento
+            valor = self.fiiscom.risco_rendimento
+        else:
+            valor = self.yf.risco_rendimento
+        self._risco_rendimento = valor
+        return valor
 
     def overall_risk(self) -> float:
         """
@@ -161,16 +244,18 @@ class FII:
         indice_base = indices_service.melhor_indice()
         spread_total = spread + indice_base
         indices = indices_service.get_indices()
+        diviendo_estimado = ativo.dividendo_estimado
+        cotacao = ativo.cotacao
 
-        dy_estimado = (ativo.dividendo_estimado /12) / ativo.cotacao * 100
-        teto_div = (ativo.dividendo_estimado /12) / spread_total * 100
+        dy_estimado = (diviendo_estimado /12) / cotacao * 100
+        teto_div = (diviendo_estimado/12) / spread_total * 100
         real = dy_estimado - indices["ipca_atual"]
-        potencial = round((((teto_div - ativo.cotacao) / ativo.cotacao)*100), 2)
+        potencial = round((((teto_div - cotacao) / cotacao)*100), 2)
         risco = round(11 - ativo.overall_risk(),1)
         score = evaluate_fii(ativo, indice_base)
         criteria_sum = sum([
-            ativo.vpa > ativo.cotacao,
-            teto_div > ativo.cotacao,
+            ativo.vpa > cotacao,
+            teto_div > cotacao,
             real > (indices["selic_atual"] - indices["ipca_atual"]),
         ])
         comprar = int(criteria_sum) == 3
@@ -180,7 +265,7 @@ class FII:
             "spread": round(spread, 4),
             "melhor_indice": indice_base,
             "ticker": ativo.ticker.split(".")[0],
-            "cotacao": round(ativo.cotacao, 2),
+            "cotacao": round(cotacao, 2),
             "vpa": round(ativo.vpa, 2) if ativo.vpa else None,
             "teto_div": round(teto_div, 2),
             "dy_estimado": round(dy_estimado, 2),
