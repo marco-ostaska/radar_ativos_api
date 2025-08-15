@@ -140,7 +140,7 @@ class FII:
             valor = self.fiiscom.dividendo_estimado * 12
         elif self.yf.dividendo_estimado:
             # print("Usando dividendo estimado do Yahoo Finance")
-            valor = self.yf.dividendo_estimado
+            valor = self.yf.dividendo_estimado * 12
         self._dividendo_estimado = valor
         return valor
 
